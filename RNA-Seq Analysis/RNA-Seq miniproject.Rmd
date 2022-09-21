@@ -29,7 +29,7 @@ This RNA-Seq data investigates genes from neurons differentiated from induced pl
 ### Data Input
 
 This code is just loading all the package libraries we would need for this R markdown. 
-```{r library loading, message=FALSE, warning=FALSE}
+```{r library loading, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
 library(BiocManager)
 library(recount)
@@ -51,6 +51,14 @@ library(pathview)
 library(org.Hs.eg.db)
 library(ReactomePA)
 library(reactome.db)
+library(devtools)
+library(conflicted)
+library(stringr)
+library(fgsea)
+library(data.table)
+library(ggplot2)
+library(rebus)
+library(europepmc)
 ```
 
 
@@ -60,7 +68,6 @@ url <- download_study("SRP022028")
 load(file.path("SRP022028", 'rse_gene.Rdata'))
 rse <- scale_counts(rse_gene)
 ```
-
 
 This code starts off by assigning the variables `projects` and `conditions` which are then combined into the `metadata` data frame which then has the row names from the `rse` column data. 
 ```{r condition setup }
@@ -75,6 +82,13 @@ metadata <- data.frame(projects,conditions)
 
 rownames(metadata) <- c("SRR836527","SRR836528", "SRR836529", "SRR836530", 
                         "SRR836531" ,"SRR836532" ,"SRR836533" ,"SRR836534")
+```
+
+The way we found out the idenfiers like `project` and `conditions` was identied by using `colData(rse)` to look at all our columns and try to identify what sample belongs to which condition. 
+```{r}
+metadata %>%
+  kbl(caption = "Metadata for SRP022028") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
 ```
 
 
@@ -150,10 +164,10 @@ bot10DEGs <- sigresults[201:210,]
 combinedDEGs <- rbind(top10DEGs,bot10DEGs)
 
 normalized_dds_counts <- counts(dds, normalized=TRUE)
-
 sig_norm_dds_counts <- normalized_dds_counts[rownames(combinedDEGs), ]
 
 heat_colors <- brewer.pal(n = 6, name = "YlOrRd")
+conflict_prefer("select","dplyr")
 
 pheatmap(sig_norm_dds_counts, 
          color = heat_colors, 
@@ -164,39 +178,18 @@ pheatmap(sig_norm_dds_counts,
 ```
 
 
-### GSEA (INCOMPLETE)(HELP REQUEST)
-
-Hi I'll try to explain, I saw on the readme that we want the top 5 genes so I assigned the new variable. The part I don't understand at all is the "Pathway" requirement, I have been looking at the fgsea vignette, and the examplePathway data but I don't know how to replicate it to make the "fgseaRes" work. Appreciate the help. and As far as I know the rankings should be correct. 
-```{r fgsea set up}
-
-rankings <- result_dataframe$stat
+### GSEA
 
 
-EnsemblIDs <- rownames(result_dataframe)
-
-names(rankings) <- EnsemblIDs
-
-pathways <- reactomePathways(names(rankings))
-pathways <- reactomePathways(names(exampleRanks))
-    
-fgseaRes <- fgsea(pathways=pathway, 
-                  stats=rankings,
-                  min =15,
-                  max =500)
-```
-
-
-
-
-Hi these 2 chunks over here were backups I was trying to do, but the second one keeps returning "No gene can be mapped" even though Im sure that the genes belong to humans. 
 ```{r Clusterprofiler set up as backup}
 
-ENSEMBL <- rownames(result)
-#REMOVES THE DECIMAL POINTS
-ENSEMBL <- gsub("\\.*","",ENBSEMBL)
+EnsemblIDs <- rownames(result_dataframe)
+EnsemblIDs <- str_replace(EnsemblIDs,
+                           pattern = "\\..*", 
+                           replacement = "")
 
-original_gene_list <- result$log2FoldChange
-names(original_gene_list) <- ENSEMBL
+original_gene_list <- result_dataframe$log2FoldChange
+names(original_gene_list) <- EnsemblIDs
 gene_list <- na.omit(original_gene_list)
 gene_list <- sort(gene_list, decreasing = TRUE)
 
@@ -205,7 +198,7 @@ gene_list <- sort(gene_list, decreasing = TRUE)
 
 
 
-```{r ERROR NO GENES CAN BE MAPPED!} 
+```{r Gene mapped, message=FALSE, warning=FALSE}
 gse <- gseGO(geneList = gene_list , ont = "ALL",
              keyType = "ENSEMBL",
              minGSSize = 3, maxGSSize = 800,
@@ -213,6 +206,11 @@ gse <- gseGO(geneList = gene_list , ont = "ALL",
              OrgDb= "org.Hs.eg.db", pAdjustMethod = "none" )
 ```
 
+
+
+```{r}
+gseaplot2(gse, geneSetID = 1:5)
+```
 
 ## Discussion
 

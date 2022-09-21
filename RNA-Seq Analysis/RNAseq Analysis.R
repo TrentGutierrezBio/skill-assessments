@@ -7,6 +7,9 @@ install.packages("DT")
 install.packages("gsea")
 install.packages("stats")
 install.packages('conflicted')
+install.packages("stringr")
+install.packages("rebus")
+install.packages('europepmc')
 
 
 
@@ -51,10 +54,16 @@ library(ReactomePA)
 library(reactome.db)
 library(devtools)
 library(conflicted)
-
+library(stringr)
 library(fgsea)
 library(data.table)
 library(ggplot2)
+library(rebus)
+library(europepmc)
+
+
+conflict_prefer("select","dplyr")
+
 
 data(examplePathways)
 data(exampleRanks)
@@ -109,19 +118,38 @@ datasets <- listDatasets(ensembl)
 head(datasets)
 
 
-EnsemblIDs <- rownames(result_dataframe)
-EnsemblIDs <- gsub("\\.*","",EnsemblIDs)
-
 
 mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
 
+mart2 = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+
+sig_ensembl_stat <- result_dataframe %>%
+  arrange(desc(stat)) %>%
+  top_n(5,stat)
+  
+sig_ensembl_stat
+
+sig_ensemblID <- rownames(sig_ensembl_stat)
+
+sig_ensemblID <- str_replace(sig_ensemblID,
+                          pattern = "\\..*", 
+                          replacement = "")
+sig_ensemblID
+
+
 
 Test <- getBM(attributes = "ensembl_gene_id", "entrezgene_id",
-              filters = "ensembl_gene_id",
-              values = EnsemblIDs,
-              mart = mart)
+              filter= "entrezgene_id",
+              values = sig_ensemblID,
+              mart = mart2)
+head(Test)
 
+mart2 = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
 
+EnsemblIDs <- rownames(result_dataframe)
+EnsemblIDs <- str_replace(EnsemblIDs,
+                           pattern = "\\..*", 
+                           replacement = "")
 
 
 
