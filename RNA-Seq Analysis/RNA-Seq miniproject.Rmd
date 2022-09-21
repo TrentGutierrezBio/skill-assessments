@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 
 ### Research question
-This RNA-Seq data investigates genes from neurons differentiated from induced pluripotent stem cells (iPSCs). the patient group includes individuals who have either 2q11.2 Deletion Syndrome (22q11.2 DS) or schizoaffective disorder (SAD), this means these individuals are at high risk to developing schizophrenia. This data includes these patient's RNA-Seq data and multiple controls. This R markdown will use the rse data provided by the respective scientist and will conduct analysis to make our own conclusion based off the data. 
+This RNA-Seq data investigates genes from neurons differentiated from induced pluripotent stem cells (iPSCs). the **patient** group includes individuals who have either 2q11.2 Deletion Syndrome (22q11.2 DS) or schizoaffective disorder (SAD), this means these individuals are at high risk to developing schizophrenia. This data includes these patient's RNA-Seq data and multiple controls. This R markdown will use the rse data provided by the respective scientist and will conduct analysis to make our own conclusion based off the data. 
 
 
 
@@ -69,7 +69,7 @@ load(file.path("SRP022028", 'rse_gene.Rdata'))
 rse <- scale_counts(rse_gene)
 ```
 
-This code starts off by assigning the variables `projects` and `conditions` which are then combined into the `metadata` data frame which then has the row names from the `rse` column data. 
+This code starts off by assigning the variables `projects` and `conditions` which are then combined into the `metadata` data frame which then has the row names from the `rse` column data. Why do we need this metadata? It mostly is used to help label what each sample is. 
 ```{r condition setup }
 
 projects <- c("SRP022028","SRP022028","SRP022028","SRP022028", 
@@ -157,7 +157,7 @@ ggplot(result_dataframe_sig_marked) +
 
 ### Heatmap of top 10 overexpressed & underexpressed DEGs
 
-This graph involves a few data transformations lets go through them step by step. Our first job is to select both the *10 over-expressed* and *10 under-expressed* significant DEGs and then combine them into one dataset called `combinedDEGs`. Next we make sure our counts from `dds` are normalized and added to a new variable `normalized_dds_counts`. Then using the row names from `combinedDEGs` we filter out the normalized count data so we have a variable `sig_norm_dds_counts` with our 20 specific genes, and then that data is heatmapped.  
+This graph involves a few data transformations lets go through them step by step. Our first job is to select both the *10 over-expressed* and *10 under-expressed* significant DEGs and then combine them into one dataset called `combinedDEGs`. Next we make sure our counts from `dds` are normalized and added to a new variable `normalized_dds_counts`. Then using the row names from `combinedDEGs` we filter out the normalized count data so we have a variable `sig_norm_dds_counts` with our 20 specific genes, and then that data is heatmapped. `conflict_prefer` is added here just to avoid synthax errors with the `select()` function. 
 ```{r heatmap}
 top10DEGs <- sigresults[1:10,]
 bot10DEGs <- sigresults[201:210,]
@@ -180,7 +180,9 @@ pheatmap(sig_norm_dds_counts,
 
 ### GSEA
 
+#### Clusterprofiler data set up
 
+The first step of this data set up is to get our `EnsemblIDs` variable, this consist of the row names from the `result_dataframe` however most of them end with a decimal point and value, this causes errors so we use `str_replace` to get rid of the "." and everything pass that point and replace it with nothing so our IDs are in the correct format for gene identification. Now we have to set up our gene list for the clusterprofiler, first it pulls the raw numbers from the result data frame for *log2FoldChange* then the Ensembl IDs are attached to this list. Then any *NA* values are removed, and finally the gene list is ordred from greatest to least, this is neccessary for the `gseGO` function to work correctly. 
 ```{r Clusterprofiler set up as backup}
 
 EnsemblIDs <- rownames(result_dataframe)
@@ -197,7 +199,7 @@ gene_list <- sort(gene_list, decreasing = TRUE)
 
 
 
-
+`gseGO()` stands for *Gene Set Enrichment Analysis of Gene Ontology* This function will do our enrichment analysis. the gene list is the one we made above, the ont value allows you to analyze for Biological Processes, Molecular Function, and Cellular components, and if you want to see all 3 choose "ALL" like we did here. KeyType is dependent on the IDs we assigned our Gene list earlier, in this dataset we have Ensembl IDs. min and max GSSize gives us the minimum and maximum of the gene count in the list to be analyzed. the p-value cutoff is what the minimum p-value cut off is. P-Adjust method has a variety of different p-value adjusting techniques but for this data we want none of them. (Warning: The Data generated here is larger than anything else in this analysis)
 ```{r Gene mapped, message=FALSE, warning=FALSE}
 gse <- gseGO(geneList = gene_list , ont = "ALL",
              keyType = "ENSEMBL",
@@ -207,9 +209,14 @@ gse <- gseGO(geneList = gene_list , ont = "ALL",
 ```
 
 
+#### gseaplot 2 graph
 
+This graph is the top 5 pathways are visualized with the `gseaplot2()` function
 ```{r}
-gseaplot2(gse, geneSetID = 1:5)
+GSEAplot <- gse %>%
+  arrange(p.adjust)%>%
+  gseaplot2(geneSetID = 1:5)
+GSEAplot
 ```
 
 ## Discussion
