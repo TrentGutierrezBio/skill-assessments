@@ -1,0 +1,230 @@
+---
+title: "RNA Seq miniproject"
+author: "Trent Gutierrez"
+date: "2022-09-15"
+output: 
+  html_document:
+    theme: "lumen"
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Introduction
+
+### Research question
+This RNA-Seq data investigates genes from neurons differentiated from induced pluripotent stem cells (iPSCs). the patient group includes individuals who have either 2q11.2 Deletion Syndrome (22q11.2 DS) or schizoaffective disorder (SAD), this means these individuals are at high risk to developing schizophrenia. This data includes these patient's RNA-Seq data and multiple controls. This R markdown will use the rse data provided by the respective scientist and will conduct analysis to make our own conclusion based off the data. 
+
+
+
+
+
+### Data Input
+
+This code is just loading all the package libraries we would need for this R markdown. 
+```{r library loading, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(BiocManager)
+library(recount)
+library(RColorBrewer)
+library(pheatmap)
+library(DT)
+library(DESeq2)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+library(fgsea)
+library(stats)
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Hs.eg.db)
+library(ReactomePA)
+library(reactome.db)
+```
+
+
+This code was provided by recount2 and was adjusted to download the rse data for the **SRP022028** experiment. The code downloads the `rse_gene.Rdata` file into a folder named "SRP022028" placed into the working directory. the `rse_gene` data is scaled into the `rse` data.  
+```{r data input, message=FALSE, warning=FALSE}
+url <- download_study("SRP022028") 
+load(file.path("SRP022028", 'rse_gene.Rdata'))
+rse <- scale_counts(rse_gene)
+```
+
+
+This code starts off by assigning the variables `projects` and `conditions` which are then combined into the `metadata` data frame which then has the row names from the `rse` column data. 
+```{r condition setup }
+
+projects <- c("SRP022028","SRP022028","SRP022028","SRP022028", 
+             "SRP022028","SRP022028","SRP022028","SRP022028")
+
+conditions <- c("patient","patient","patient","patient",
+                "control","control","control","control")
+
+metadata <- data.frame(projects,conditions)
+
+rownames(metadata) <- c("SRR836527","SRR836528", "SRR836529", "SRR836530", 
+                        "SRR836531" ,"SRR836532" ,"SRR836533" ,"SRR836534")
+```
+
+
+To allow further statistical analysis the `colData()` function was used to view information in `rse` and we can see with the "characteristics" column where our *patient* and *control* samples are indicated. This leads to the addition of the `conditions` column into `rse` so the `DESeq2()` package can interpret the data. The next step is to turn the `rse` data into `dds` which stands for *DESeqDataSet* and then this dataset is ran through `DESeq()` to run the actual differential expression analysis. 
+```{r DESeq dataset start,message=FALSE, warning=FALSE}
+rse$condition <- conditions
+
+dds <- DESeqDataSet(rse, design = ~condition)
+dds <-DESeq(dds)
+```
+
+
+Once the differential expression analysis is complete we still have the `dds` but now it has a **results** function which is assigned to the variable `result` (for later graphs, `result` is also transformed into the data frame `result_dataframe` to make interpretation easier) This `result` variable holds very important information such as the **log2 fold change** and **wald test p-value** using the condition specified earlier *patient* vs *control*
+```{r results from the dds}
+result <- results(dds)
+result_dataframe <- as.data.frame(result)
+```
+
+
+## Results
+
+
+### Signifcant Differentially Expressed Genes (DEGs)
+
+Now we can start to explore our data, first we want to acquire the actually significantly DEGs from our `result` function. First step is to order the result section by the *p-value*. Next is to filter the results slightly by removing any genes that have a *p-adjusted* value higher than 0.05 (5%) we choose this value likely because it leaves just the genes that gives us around a 95% confidence of being actually significant. To visualize our selected significant DEGs a data table was constructed.      
+```{r signifcant DEGs}
+orderedresults <- result[order(result$pvalue),]
+
+sigresults <- subset(orderedresults, padj < 0.05)
+
+sigresults_dataframe <- as.data.frame(sigresults)
+datatable(sigresults_dataframe, class = 'cell-border stripe' , 
+          colnames = c("ENSEMBL Name" = 1), 
+          caption = "Table 1: Patient vs Control Significant Genes")
+```
+
+
+### PCA Plot
+
+A PCA plot is used to show how our samples cluster and if it correlates to the treatments. First we want to assign a new variable `vsd_dds` that just normalizes the count from the `dds` data. With the normalized data we construct our PCA graph with the groups *condition* and *sample* to help us identify which samples are which. 
+```{r PCA plot}
+vsd_dds <- vst(dds, blind = FALSE)
+
+plotPCA(vsd_dds, intgroup = c("condition","sample"))
+```
+
+### Volcano Plot
+
+Volcano plots give a bigger picture view of our data. First we add a new column *threshold* which returns TRUE/FALSE/NA depending if the row has a *p-adjusted* value less than 5% and this is assigned a new variable `result_dataframe_sig_marked`. This data is plotted. 
+```{r Volcano plot, message=FALSE, warning=FALSE}
+result_dataframe_sig_marked <- data.frame(result_dataframe) %>%
+  mutate(threshold = padj < 0.05)
+
+ggplot(result_dataframe_sig_marked) + 
+  geom_point(aes(x = log2FoldChange, y= -log10(padj), col = threshold)) + 
+  xlim(c(-10,10))+
+  ylim(c(0,15))+
+  labs(
+    x = "log2 Fold Change" , 
+    y = "-log10 adjusted p-value" , 
+    title = "Volcano plot of signifcant DEGs") +
+  theme(legend.position = "bottom", plot.title = element_text(size = rel(1.5), hjust = 0.5), 
+              axis.title = element_text(size = rel(1.25)))
+```
+
+
+### Heatmap of top 10 overexpressed & underexpressed DEGs
+
+This graph involves a few data transformations lets go through them step by step. Our first job is to select both the *10 over-expressed* and *10 under-expressed* significant DEGs and then combine them into one dataset called `combinedDEGs`. Next we make sure our counts from `dds` are normalized and added to a new variable `normalized_dds_counts`. Then using the row names from `combinedDEGs` we filter out the normalized count data so we have a variable `sig_norm_dds_counts` with our 20 specific genes, and then that data is heatmapped.  
+```{r heatmap}
+top10DEGs <- sigresults[1:10,]
+bot10DEGs <- sigresults[201:210,]
+combinedDEGs <- rbind(top10DEGs,bot10DEGs)
+
+normalized_dds_counts <- counts(dds, normalized=TRUE)
+
+sig_norm_dds_counts <- normalized_dds_counts[rownames(combinedDEGs), ]
+
+heat_colors <- brewer.pal(n = 6, name = "YlOrRd")
+
+pheatmap(sig_norm_dds_counts, 
+         color = heat_colors, 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE,
+         annotation =  select(metadata,conditions), 
+         scale = "row")
+```
+
+
+### GSEA (INCOMPLETE)(HELP REQUEST)
+
+Hi I'll try to explain, I saw on the readme that we want the top 5 genes so I assigned the new variable. The part I don't understand at all is the "Pathway" requirement, I have been looking at the fgsea vignette, and the examplePathway data but I don't know how to replicate it to make the "fgseaRes" work. Appreciate the help. and As far as I know the rankings should be correct. 
+```{r fgsea set up}
+
+rankings <- result_dataframe$stat
+
+
+EnsemblIDs <- rownames(result_dataframe)
+
+names(rankings) <- EnsemblIDs
+
+pathways <- reactomePathways(names(rankings))
+pathways <- reactomePathways(names(exampleRanks))
+    
+fgseaRes <- fgsea(pathways=pathway, 
+                  stats=rankings,
+                  min =15,
+                  max =500)
+```
+
+
+
+
+Hi these 2 chunks over here were backups I was trying to do, but the second one keeps returning "No gene can be mapped" even though Im sure that the genes belong to humans. 
+```{r Clusterprofiler set up as backup}
+
+ENSEMBL <- rownames(result)
+#REMOVES THE DECIMAL POINTS
+ENSEMBL <- gsub("\\.*","",ENBSEMBL)
+
+original_gene_list <- result$log2FoldChange
+names(original_gene_list) <- ENSEMBL
+gene_list <- na.omit(original_gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+```
+
+
+
+
+```{r ERROR NO GENES CAN BE MAPPED!} 
+gse <- gseGO(geneList = gene_list , ont = "ALL",
+             keyType = "ENSEMBL",
+             minGSSize = 3, maxGSSize = 800,
+             pvalueCutoff = 0.05, verbose = TRUE,
+             OrgDb= "org.Hs.eg.db", pAdjustMethod = "none" )
+```
+
+
+## Discussion
+
+
+
+
+## Conclusion
+
+
+
+
+
+
+
+

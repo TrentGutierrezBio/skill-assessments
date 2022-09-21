@@ -1,0 +1,141 @@
+---
+title: "SRP049553 Practice"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(BiocManager)
+library(recount)
+library(RColorBrewer)
+library(pheatmap)
+library(DT)
+library(DESeq2)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+library(fgsea)
+library(stats)
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Hs.eg.db)
+library(ReactomePA)
+library(reactome.db)
+library(devtools)
+library(conflicted)
+```
+
+
+
+```{r data input, message=FALSE, warning=FALSE}
+url <- download_study("SRP049553") 
+load(file.path("SRP049553", 'rse_gene.Rdata'))
+rse <- scale_counts(rse_gene)
+```
+
+
+
+```{r condition setup }
+
+projects <- c("SRP049553","SRP049553","SRP049553","SRP049553",
+              "SRP049553","SRP049553","SRP049553","SRP049553",
+              "SRP049553","SRP049553","SRP049553")
+
+conditions <- c("control","control","control","control",
+                "control","control","treatment","treatment",
+                "treatment","treatment","treatment")
+
+metadata <- data.frame(projects,conditions)
+
+rownames(metadata) <- c("SRR1640715","SRR1640716","SRR1640717","SRR1640718",
+                        "SRR1640719","SRR1640720","SRR1640721","SRR1640722",
+                        "SRR1640723","SRR1640725","SRR1640726")
+```
+
+
+
+```{r DESeq dataset start,message=FALSE, warning=FALSE}
+rse$condition <- conditions
+
+dds <- DESeqDataSet(rse, design = ~condition)
+dds <-DESeq(dds)
+```
+
+
+
+```{r results from the dds}
+result <- results(dds)
+result_dataframe <- as.data.frame(result)
+```
+
+
+
+```{r signifcant DEGs}
+orderedresults <- result[order(result$pvalue),]
+
+sigresults <- subset(orderedresults, padj < 0.05)
+
+sigresults_dataframe <- as.data.frame(sigresults)
+datatable(sigresults_dataframe, class = 'cell-border stripe' , 
+          colnames = c("ENSEMBL Name" = 1), 
+          caption = "Table 1: Patient vs Control Significant Genes")
+```
+
+```{r PCA plot}
+vsd_dds <- vst(dds, blind = FALSE)
+
+plotPCA(vsd_dds, intgroup = c("condition","sample"))
+```
+
+
+
+```{r Volcano plot, message=FALSE, warning=FALSE}
+result_dataframe_sig_marked <- data.frame(result_dataframe) %>%
+  mutate(threshold = padj < 0.05)
+
+ggplot(result_dataframe_sig_marked) + 
+  geom_point(aes(x = log2FoldChange, y= -log10(padj), col = threshold)) + 
+  xlim(c(-10,10))+
+  ylim(c(0,15))+
+  labs(
+    x = "log2 Fold Change" , 
+    y = "-log10 adjusted p-value" , 
+    title = "Volcano plot of signifcant DEGs") +
+  theme(legend.position = "bottom", plot.title = element_text(size = rel(1.5), hjust = 0.5), 
+              axis.title = element_text(size = rel(1.25)))
+```
+
+
+
+
+```{r heatmap}
+top10DEGs <- sigresults[1:10,]
+bot10DEGs <- sigresults[201:210,]
+combinedDEGs <- rbind(top10DEGs,bot10DEGs)
+
+normalized_dds_counts <- counts(dds, normalized=TRUE)
+
+sig_norm_dds_counts <- normalized_dds_counts[rownames(combinedDEGs), ]
+
+heat_colors <- brewer.pal(n = 6, name = "YlOrRd")
+
+pheatmap(sig_norm_dds_counts, 
+         color = heat_colors, 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE,
+         annotation =  select(metadata,conditions), 
+         scale = "row")
+```
+
+
+
+

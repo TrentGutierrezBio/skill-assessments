@@ -1,0 +1,292 @@
+---
+title: "R for Data Science Assignment pt2"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: "cosmo"
+    highlight: "tango"
+    toc: true
+    toc_float:
+      collapsed: true 
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+The first step of this assignment is to load all of the packages we need. Next is to read in the `gapminder_clean.csv` data and assign it as **gapminder** this will be the original dataset and every preceding graph will use parts of this dataset. To avoid future errors the NA values were changed to 0. 
+```{r orginal data, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+
+gapminder <- (read.csv("gapminder_clean.csv")) %>%
+  as_tibble()
+gapminder[is.na(gapminder)] <- 0
+```
+
+This is the original dataset **gapminder** which shows a variety of data for different countries from 1962 to 2007. This table shows how the countries are organized into rows by year. Each country has 35 years of information collection, this example has the countries "Afghanistan" and "Albania" shown, more countries and information will be investigated throughout this markdown. 
+```{r data output}
+gapminder[1:15,1:5] %>%
+  kbl(caption = "Gapminder dataset snapshot") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
+```
+
+## 1962 Data
+
+The first question we will be asking is what is the relationship between the *CO2 Emissions (metric tons per capita)* and *GDP (per capita)* during the year *1962* for all the countries. First we filter our data into a new variable named **gapminder1962** that holds every country's 1962 data relating to *CO2 Emissions* and *GDP per capita*. 
+```{r 1962 data filtered}
+gapminder1962data <- gapminder %>%
+  filter(Year == 1962) %>%
+  select(Country.Name, gdpPercap, Year, CO2.Emissions = CO2.emissions..metric.tons.per.capita.) 
+```
+
+
+### Rough Draft 1962 CO2 Emission and GDP graph 
+
+This is a rough scatterplot graph for using the 1962 data we just created. It is very plain but we will add more advanced plotting features later.  
+```{r CO2 Emission Graph}
+ggplot(gapminder1962data, mapping = aes(x = CO2.Emissions, y= gdpPercap)) +
+  geom_point() +
+  labs(
+    x = "CO2 emissions (metric tons per capita)",
+    y = "GDP per capita",
+    title = "CO2 Emission Compared With GDP Per Capita in 1962"
+  )
+```
+
+
+
+### CO2 Emission and GDP stat test
+
+looking at the graph above an important question to ask is "what is the correlation between x and y?" 
+This code will print out the correlation for the graph above. 
+```{r 1962 CO2 and GDP correlation}
+gapminder1962data %>% 
+  group_by(Year) %>%
+  summarize(cor = cor(CO2.Emissions,gdpPercap)) %>%
+  kbl(caption = "correlation for 1962") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+
+
+P-values are also every important for statistical analysis. the code below is still using the 1962 data. (The actual p-value is 5.53e-36, but the output is just 0 due to being so small) 
+```{r}
+p_value <- cor.test(gapminder1962data$CO2.Emissions,gapminder1962data$gdpPercap)
+p_value$p.value %>%
+  kbl(caption = "p-value for 1962") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+## Highest Correlation analysis
+
+This code looks at the correlation values for all the year values in our **gapminder** dataset, then it chooses the top correlation value and prints out the top year. 
+```{r correlation test with the years}
+gapminderhighcor<- gapminder %>%
+  select(Country.Name,Year,gdpPercap,CO2.Emissions = CO2.emissions..metric.tons.per.capita.) %>%
+  group_by(Year) %>% 
+  summarize(cor = cor(CO2.Emissions, gdpPercap)) %>%
+  top_n(1,cor)
+
+gapminderhighcor %>%
+  kbl(caption = "The year with the highest correlation value") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+
+### Graph for highest correlated year with CO2 Emission and GDP
+
+This is the plotly graph for our CO2 Emission and GDP for the year 1962 dataset. It has the same general structure of the graph up top but it now shows extra information! First thing to discuss is now that each dot has a color that corresponds a continent as listed on the legend to the right, next would be that the size of the dot is determined by the value of their population. the function `ggplotly()` makes this graph intractable to where you can hover over and see the information for each data point. 
+```{r plotly graph of CO2 for 1962}
+scatterplot <- gapminder %>%
+  select(Country.Name,Year,CO2.Emission = CO2.emissions..metric.tons.per.capita.,continent,pop,gdpPercap) %>%
+  filter(Year == 1962, na.rm = TRUE) %>%
+  ggplot(mapping = aes(x=CO2.Emission, y=gdpPercap, size = pop, col = continent,)) + 
+  geom_point() +
+  labs(
+    x = "CO2 emissions (metric tons per capita)",
+    y = "GDP per capita",
+    title = "CO2 Emission Compared With GDP Per Capita in 1962") 
+ggplotly(scatterplot)
+```
+
+
+
+
+
+
+## Energy Use Analysis
+
+Now we are going to use a new dataset named **energyuse** which is going to use the *Energy use (kg of oil equivalent per capita)* column. This code will separate each of the continents and then average out their energy usage from 1962 to 2007, and then print out the final value. 
+```{r energy use by continent}
+continents <- c("Africa","Americas","Asia","Europe","Oceania")
+
+energyuse <- gapminder %>%
+  select(continent, EnergyUse = Energy.use..kg.of.oil.equivalent.per.capita.) %>%
+  group_by(continent ) %>%
+  filter(continent %in% continents) %>%
+  summarize(Avg_Energy_Use= mean(EnergyUse))
+  
+
+energyuse %>%
+  kbl(caption = "Average energy use per continent") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+### Energy use graph
+
+This plotly graph will break down the energy usage as a histogram and separates each of the continents into their own smaller graph. 
+```{r count data of energy use, message=FALSE, warning=FALSE}
+energygraph <- gapminder %>%
+  select(Country.Name,Year, continent,EnergyUse = Energy.use..kg.of.oil.equivalent.per.capita.) %>%
+  filter(continent %in% continents, EnergyUse != 0) %>%
+  ggplot(mapping = aes(EnergyUse, col = continent)) +
+  geom_histogram() + 
+  labs(
+    x = "Energy use (kg of oil equivalent per capita)",
+    y = "Count",
+    title = "Energy Usage Per Continent from 1962 to 2007") +
+  facet_wrap(~continent)
+
+ggplotly(energygraph)
+```
+
+
+
+
+## Import GDP% 
+
+Now we will look at just Europe and Asia for this next dataset, we will name it **comparedcontinent**. This dataset includes all the countries from Europe and Asia, the *Imports of goods and services (% of GDP)*, and only including years *after 1990*. The average GDP% from imports was calculated for the two continents. 
+```{r comparision of continent GDP from imports}
+FocusContinent <- c("Europe","Asia")
+comparedcontinent <- gapminder %>%
+  select(continent, Year, ImportEcon = Imports.of.goods.and.services....of.GDP.) %>%
+  filter(continent %in% FocusContinent, Year > 1990)
+
+avgcompareddata <- comparedcontinent %>%
+  group_by(continent) %>%
+  summarize(average.income = mean(ImportEcon))
+
+avgcompareddata %>%
+  kbl(caption = "Comparision of Europe and Asia's GDP% from imports for years after 1990") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+
+
+
+
+### Import GDP% graph
+
+This plotly graph is showing the growth of the GDP% from Imports of goods and services for Europe and Asia from 1992 to 2007. 
+```{r comparing the continents import GDP over the years, message=FALSE, warning=FALSE}
+comparedgraph <- ggplot(comparedcontinent, mapping = aes(x=Year, y= ImportEcon), col= continent) +
+  geom_smooth() + 
+  labs(
+    x = "Years",
+    y = "GDP% from imports",
+    title = "GDP% Growth from Imports from 1990 to 2007" ) + 
+  facet_wrap(~continent)
+ggplotly(comparedgraph)
+```
+
+
+
+
+## Population Density Analysis
+
+This is a new dataset **density** which focuses on *Population density (people per sq. km of land area)*. 
+```{r desnisty data selection}
+density <- gapminder %>%
+  select(Country.Name,Year,Population.density = Population.density..people.per.sq..km.of.land.area.)
+```
+
+
+### Population Density yearly ranking
+
+This loop will look at the **density** dataset and look at every year interval and print out which country has the highest population density for that year and then loops until all the years are covered. 
+```{r Shows the top population density over a span of 40 years}
+X <- 1962 
+while(X !=  2012) {
+  innerdata <-density %>%
+    filter(Year == X) %>%
+    top_n(1,Population.density)
+    print(paste(innerdata[1,1], "had the record population density of people per sq km of land area of",
+                innerdata[1,3], "on the year", innerdata[1,2]))
+  X <- X + 5
+} 
+```
+
+
+### Population density graph 
+
+This plotly graph shows visually the highest population values for each year. 
+```{r desnity graph }
+densitygraph <- ggplot(density, mapping = aes(x=Year,y=Population.density,col= Country.Name)) + 
+  geom_point() +
+  labs(
+    x = "Years",
+    y = "Population Density (people per sq. km of land area)",
+    title = "Population Density of countries from 1962 to 2007"
+  )
+ggplotly(densitygraph)
+```
+
+
+
+## Life Expectancy Analysis
+
+This dataset **lifeexp** looks at the *Life expectancy at birth, total (years)* for the countries over the years. Then we want to see the highest increase of life expectancy from 1962 to 2007. This code's output is the five countries with the greatest increase to life expectancy from the years 1962 to 2007.
+```{r life expectancy range selection}
+lifeexp <- gapminder %>%
+  select(Country_Name = Country.Name,Year, Life.expectancy.yrs = Life.expectancy.at.birth..total..years.) 
+
+toplifeexp <- lifeexp %>%
+  group_by(Country_Name) %>%
+  summarize(Life_exectancy_increase = max(Life.expectancy.yrs)-min(Life.expectancy.yrs)) %>%
+  top_n(5,Life_exectancy_increase)
+
+toplifeexp %>%
+  kbl(caption = "Countries with the Greatest Increase to Life Expectancy") %>%
+  kable_styling(bootstrap_options = "striped",full_width = F, html_font = "Cambria", position = "left")
+```
+
+
+
+### Life Expectancy graph 
+
+This plotly graph shows the top 5 countries with the highest life expectancy increase. 
+```{r life expectancy over the years graphs for the top 5, message=FALSE, warning=FALSE}
+toplifecontries <- c("San Marino","Faroe Islands",
+                "Bermuda","Liechtenstein","St. Martin (French part)")
+
+filteredlifeexp <- lifeexp %>%
+  filter(Country_Name %in% toplifecontries)
+
+lifegraph <- filteredlifeexp %>% 
+  ggplot(mapping = aes(x=Year, y= Life.expectancy.yrs, col = Country_Name)) +
+  geom_smooth() +
+  labs(
+    x = "Year",
+    y = "Life Expectancy (yrs)",
+    title = "Life Expectancy Comparision for Top 5 Countries" ) + 
+  facet_wrap(~Country_Name, nrow = 2) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), legend.position = "none") +
+  scale_y_continuous(breaks = seq(0,100,20), 
+                     minor_breaks = seq(0,100,5))
+ggplotly(lifegraph)
+```

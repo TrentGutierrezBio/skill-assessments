@@ -1,0 +1,43 @@
+---
+title: "Linux assignment"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Q1: What is your home directory?
+
+A1:`pwd` returns */home/ec2-user*
+
+
+Q2: What is the output of this command?
+
+A2: `ls` returns *hello_world.txt*
+
+
+Q3. What is the output of each `ls` command?
+
+A3: `ls my_folder` returns nothing
+    `ls my_folder2` returns *hello_world.txt*
+
+
+Q4: What is the output of each?
+
+A4: `ls my_folder` returns nothing
+    `ls my_folder3` returns nothing
+    `ls my_folder3` returns *hello_world.txt*
+
+
+Q5: What editor did you use and what was the command to save your file changes?
+
+A5: `nano hello_world.txt` and then changed "world" to "Linux" and used ctrl-x  
+    to exit and saved my changes with y, and left the file's name alone. 
+
+
+
+
+
