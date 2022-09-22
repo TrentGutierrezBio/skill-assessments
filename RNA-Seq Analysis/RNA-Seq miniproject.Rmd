@@ -212,7 +212,7 @@ gse <- gseGO(geneList = gene_list , ont = "ALL",
 #### gseaplot 2 graph
 
 This graph is the top 5 pathways are visualized with the `gseaplot2()` function
-```{r}
+```{r GSEA2 Plot}
 GSEAplot <- gse %>%
   arrange(p.adjust)%>%
   gseaplot2(geneSetID = 1:5)
@@ -221,9 +221,18 @@ GSEAplot
 
 ## Discussion
 
+Now that all the graphs have been created using our SRP022028 data, we can begin to look at the data generated and begin to make inferences of our samples. All inferences will be based purely on the data generated above.  
 
+The first data to talk about is the identification of significant differentially expressed genes (DEGs) our filtered table has a total of 210 DEGs from a total of 58,037 genes with a 95% confidence of being significant. 
 
+The PCA plot is used to give a good general idea of how our samples cluster. Looking at the plot there is some clustering with the control and patient samples, Patient sample: SRS417724 and SRS417725 are closely clustered together, and another cluster group consist of Patient samples: SRS417723 and SRS417726 with 1 control sample included close by control: SRS417727, and the final cluster group could be the control samples: SRS417728, SRS417730, and SRS417729. The implications from this plot can be that the patient and control samples are reasonably clustered into different sections so the DEGs should actually be somewhat differentially  expressed. 
 
+The Volcano plot shows us all our genes plotted by their log2 Fold change and -log10 p-adj value. The points plotted in blue means that they met the threshold of having a p-adj value lower than 5% giving us our standard 95% confidence. The points in red mean they did not meet the threshold. 
+
+The heatmap of the top 10 over-expressed and 10 under-expressed DEGs shows us the expression of our 8 samples, the top of the heatmap shows us the conditions of the samples on the bottom. The first thing we can see is that the control side has a greater average expression level for most of the genes than the patient side. A possible reason this may be is that with the patient samples that are affected by 22q11.2 DS could have lower expression in these genes depending on where the genes are located and what their function are. 
+
+The gseaplot2 graph shows the enrichment scores for the top 5 pathways sorted by their p-adjusted value. the 5 selected pathways seem to have a very similar enrichment score lines, The peak of this line is what we want to look at. Our graph peaks around rank 37000-38000, and the bottom graph shows our gene's ranked list metric in the negatives which could mean the correlation with our genes can either mean a second phenotype expression or an inverse correlation with their function. 
+ 
 ## Conclusion
 
 

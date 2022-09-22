@@ -4,14 +4,14 @@ install.packages("RSQLite")
 install.packages("RColorBrewer")
 install.packages("pheatmap")
 install.packages("DT")
-install.packages("gsea")
 install.packages("stats")
 install.packages('conflicted')
 install.packages("stringr")
 install.packages("rebus")
 install.packages('europepmc')
-
-
+install.packages("kableExtra")
+install.packages("plotly")
+install.packages("devtools")
 
 BiocManager::install(version = "3.15")
 
@@ -52,7 +52,6 @@ library(pathview)
 library(org.Hs.eg.db)
 library(ReactomePA)
 library(reactome.db)
-library(devtools)
 library(conflicted)
 library(stringr)
 library(fgsea)
@@ -60,7 +59,7 @@ library(data.table)
 library(ggplot2)
 library(rebus)
 library(europepmc)
-
+library(devtools)
 
 conflict_prefer("select","dplyr")
 
