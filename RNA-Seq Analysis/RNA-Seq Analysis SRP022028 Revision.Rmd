@@ -1,0 +1,230 @@
+---
+title: "RNA-Seq Analysis SRP022028 Revision"
+author: "Trent Gutierrez"
+date: "2022-09-27"
+output: 
+  html_document:
+    theme: "lumen"
+    code_folding: hide
+    toc: true
+    toc_float: 
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+### Research question
+
+
+
+### Data Input
+
+```{r library loading, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(BiocManager)
+library(recount)
+library(RColorBrewer)
+library(pheatmap)
+library(DT)
+library(DESeq2)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+library(fgsea)
+library(stats)
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Hs.eg.db)
+library(devtools)
+library(conflicted)
+library(stringr)
+library(fgsea)
+library(data.table)
+library(biomaRt)
+```
+
+
+
+```{r data input, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
+url <- download_study("SRP022028") 
+load(file.path("SRP022028", 'rse_gene.Rdata'))
+```
+
+
+
+```{r condition setup, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
+metadata <- colData(rse_gene)
+
+metadata$conditions <- sapply(metadata$characteristics, function(x){ x[1]})
+
+metadata$genotype <- grepl("22q11", metadata$title) %>%
+  ifelse("22q11Del","WT")
+```
+
+
+```{r metadata table, message=FALSE, warning=FALSE}
+metadata %>% 
+  as.data.frame() %>%
+  dplyr::select(genotype,conditions) %>%
+  kbl(caption = "Metadata for SRP022028") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
+```
+
+```{r DESeq2 analysis start, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
+rse_gene$condition <- metadata$conditions 
+rse_gene$condition <- gsub("sample group: patients","patients",rse_gene$condition)
+rse_gene$condition <- gsub("sample group: contol","control",rse_gene$condition)
+
+dds <- DESeqDataSet(rse_gene, design = ~condition)
+dds <- DESeq(dds)
+```
+
+```{r dds result extraction, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
+result <- results(dds, contrast = c("condition","patients","control"))
+
+result_dataframe <- as.data.frame(result)
+```
+
+
+
+## Results
+
+### Exploratory Analysis 
+
+```{r PCA plot, message=FALSE, warning=FALSE}
+vsd_dds <- vst(dds)
+
+plotPCA(vsd_dds, intgroup = c("condition"))
+```
+
+
+
+
+### Statistical Analysis 
+
+
+
+
+```{r signifcant DEGs selection, cache=TRUE}
+orderedresults <- result[order(result$stat),]
+
+sigresults <- subset(orderedresults, padj < 0.05)
+sigresults_dataframe <- as.data.frame(sigresults)
+
+```
+
+
+```{r Gene symbol ID selection, cache=TRUE}
+
+
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+
+ensemblID <- rownames(sigresults_dataframe)
+ensemblID <- str_replace(ensemblID,
+                          pattern = "\\..*", 
+                          replacement = "")
+
+#ERROR ERROR ERROR, For some reason ensemblID has 699 values, but the sigresult_gene_id returns 689 values, and some genes don't have a gene name associated. 
+sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","external_gene_name"),
+                           filters = "ensembl_gene_id",
+                           values = ensemblID,
+                           mart = ensembl)
+
+sigresult_datatable <- sigresults_dataframe[rownames(sigresult_gene_id$external_gene_name),]
+
+```
+
+
+```{r sig DEGs datatable}
+datatable(sigresult_datatable, class = 'cell-border stripe' , 
+          colnames = c("Gene Symbol" = 1), 
+          caption = "Table 1: Patient vs Control Significant Genes")
+```
+
+
+
+
+
+```{r enhanced Volcano plot, message=FALSE, warning=FALSE}
+result_treshold_dataframe <- data.frame(result_dataframe) %>%
+  mutate(threshold = padj < 0.05)
+
+ggplot(result_treshold_dataframe) + 
+  geom_point(aes(x = log2FoldChange, y= -log10(padj), col = threshold)) + 
+  xlim(c(-10,10))+
+  ylim(c(0,15))+
+  labs(
+    x = "log2 Fold Change" , 
+    y = "-log10 adjusted p-value" , 
+    title = "Volcano plot of signifcant DEGs") +
+  theme(legend.position = "bottom", plot.title = element_text(size = rel(1.5), hjust = 0.5), 
+              axis.title = element_text(size = rel(1.25)))
+```
+
+
+
+```{r heatmap}
+
+topover <- sigresults_dataframe %>% slice_max(stat, n = 10)
+topunder <- sigresults_dataframe %>% slice_min(stat, n = 10)
+
+topoverandunder <- rbind(topover,topunder) 
+
+normalized_dds_counts <- counts(dds, normalized=TRUE)
+sig_norm_dds_counts <- normalized_dds_counts[rownames(topoverandunder), ]
+
+heat_colors <- brewer.pal(n = 6, name = "YlOrRd")
+
+heatmeta <- as.data.frame(metadata) %>%
+  dplyr::select(conditions,genotype)
+
+pheatmap(sig_norm_dds_counts, 
+         color = heat_colors, 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE,
+         annotation = dplyr::select(heatmeta,conditions), 
+         scale = "row")
+```
+
+```{r Clusterprofiler set up as backup, include=FALSE, cache=TRUE}
+
+original_gene_list <- result_dataframe$log2FoldChange
+names(original_gene_list) <- ensemblID
+gene_list <- na.omit(original_gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+```
+
+
+
+```{r Gene mapped, message=FALSE, warning=FALSE, cache=TRUE}
+gse <- gseGO(geneList = gene_list , ont = "ALL",
+             keyType = "ENSEMBL",minGSSize = 1, 
+             maxGSSize = 10000, 
+             pvalueCutoff = 0.05, verbose = TRUE,
+             OrgDb= "org.Hs.eg.db", pAdjustMethod = "BH")
+```
+
+
+```{r GSEA2 Plot}
+GSEAplot <- gse %>%
+  arrange(stat)%>%
+  gseaplot2(geneSetID = 1:5)
+GSEAplot
+```
+
+
+
+
+
+
