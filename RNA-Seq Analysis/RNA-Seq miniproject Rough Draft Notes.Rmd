@@ -130,7 +130,7 @@ datatable(sigresults_dataframe, class = 'cell-border stripe' ,
 
 ### PCA Plot
 
-A PCA plot is used to show how our samples cluster and if it correlates to the treatments. First we want to assign a new variable `vsd_dds` that just normalizes the count from the `dds` data. With the normalized data we construct our PCA graph with the groups *condition* and *sample* to help us identify which samples are which. 
+A PCA plot is used to show how our samples cluster and if it correlates to the treatments. First we want to assign a new variable `vsd_dds` that just normalizes the count from the `dds` data. With the normalized data we construct our PCA graph with the groups *condition* and *sample* to help us identify which samples are which. BLIND introduces a bias in what we want to be an unbiased overview of our data so We don't want to use that variable. 
 ```{r PCA plot}
 vsd_dds <- vst(dds)
 

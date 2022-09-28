@@ -31,8 +31,10 @@ BiocManager::install("enrichplot")
 BiocManager::install("org.Hs.eg.db", character.only = TRUE)
 BiocManager::install("ReactomePA")
 BiocManager::install("reactome.db")
+BiocManager::install('EnhancedVolcano')
+BiocManager::install("recount3")
 
-
+library("recount3")
 
 library(tidyverse)
 library(BiocManager)
@@ -62,7 +64,7 @@ library(ggplot2)
 library(rebus)
 library(europepmc)
 library(devtools)
-
+library(EnhancedVolcano)
 
 
 

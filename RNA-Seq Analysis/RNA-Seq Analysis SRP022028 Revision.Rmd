@@ -51,6 +51,7 @@ library(stringr)
 library(fgsea)
 library(data.table)
 library(biomaRt)
+library(EnhancedVolcano)
 ```
 
 
@@ -82,6 +83,7 @@ metadata %>%
 
 ```{r DESeq2 analysis start, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 rse_gene$condition <- metadata$conditions 
+rse_gene$genotype  <- metadata$genotype
 rse_gene$condition <- gsub("sample group: patients","patients",rse_gene$condition)
 rse_gene$condition <- gsub("sample group: contol","control",rse_gene$condition)
 
@@ -104,7 +106,7 @@ result_dataframe <- as.data.frame(result)
 ```{r PCA plot, message=FALSE, warning=FALSE}
 vsd_dds <- vst(dds)
 
-plotPCA(vsd_dds, intgroup = c("condition"))
+plotPCA(vsd_dds, intgroup = c("condition","genotype"))
 ```
 
 
@@ -135,18 +137,17 @@ ensemblID <- str_replace(ensemblID,
                           replacement = "")
 
 #ERROR ERROR ERROR, For some reason ensemblID has 699 values, but the sigresult_gene_id returns 689 values, and some genes don't have a gene name associated. 
-sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","external_gene_name"),
+sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
                            filters = "ensembl_gene_id",
                            values = ensemblID,
                            mart = ensembl)
-
-sigresult_datatable <- sigresults_dataframe[rownames(sigresult_gene_id$external_gene_name),]
+rownames(sigresults_dataframe) <- sigresult_gene_id$hgnc_symbol
 
 ```
 
 
 ```{r sig DEGs datatable}
-datatable(sigresult_datatable, class = 'cell-border stripe' , 
+datatable(sigresults_dataframe, class = 'cell-border stripe' , 
           colnames = c("Gene Symbol" = 1), 
           caption = "Table 1: Patient vs Control Significant Genes")
 ```
@@ -155,9 +156,22 @@ datatable(sigresult_datatable, class = 'cell-border stripe' ,
 
 
 
+
+
 ```{r enhanced Volcano plot, message=FALSE, warning=FALSE}
-result_treshold_dataframe <- data.frame(result_dataframe) %>%
-  mutate(threshold = padj < 0.05)
+results_treshold_dataframe <- data.frame(result_dataframe) %>%
+  dplyr::mutate(threshold = padj < 0.05)
+
+EnhancedVolcano(result_treshold_dataframe, 
+                lab = rownames(result_treshold_dataframe),
+                x = 'log2FoldChange',
+                y = 'pvalue')
+
+
+```
+
+
+```{r Other Volcano plot, message=FALSE, warning=FALSE}
 
 ggplot(result_treshold_dataframe) + 
   geom_point(aes(x = log2FoldChange, y= -log10(padj), col = threshold)) + 
@@ -198,8 +212,14 @@ pheatmap(sig_norm_dds_counts,
 
 ```{r Clusterprofiler set up as backup, include=FALSE, cache=TRUE}
 
-original_gene_list <- result_dataframe$log2FoldChange
-names(original_gene_list) <- ensemblID
+fullensemblID <- rownames(result_dataframe)
+fullensemblID <- str_replace(fullensemblID,
+                          pattern = "\\..*", 
+                          replacement = "")
+
+
+original_gene_list <- result_dataframe$stat
+names(original_gene_list) <- fullensemblID
 gene_list <- na.omit(original_gene_list)
 gene_list <- sort(gene_list, decreasing = TRUE)
 
@@ -209,16 +229,14 @@ gene_list <- sort(gene_list, decreasing = TRUE)
 
 ```{r Gene mapped, message=FALSE, warning=FALSE, cache=TRUE}
 gse <- gseGO(geneList = gene_list , ont = "ALL",
-             keyType = "ENSEMBL",minGSSize = 1, 
-             maxGSSize = 10000, 
+             keyType = "ENSEMBL",
              pvalueCutoff = 0.05, verbose = TRUE,
-             OrgDb= "org.Hs.eg.db", pAdjustMethod = "BH")
+             OrgDb= "org.Hs.eg.db", pAdjustMethod = "holm")
 ```
 
 
 ```{r GSEA2 Plot}
-GSEAplot <- gse %>%
-  arrange(stat)%>%
+GSEAplot <- c %>%
   gseaplot2(geneSetID = 1:5)
 GSEAplot
 ```
