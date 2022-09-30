@@ -1,0 +1,19 @@
+---
+title: "Linux Personal Notes"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+To add a user: $ sudo adduser [name]
+to delete a user: $ sudo userdel -r [name]
+to add a password to a user: $ sudo passwd [name]
+                               Make a password ^
+
+to give our user Sudo access: $ sudo usermod -a -G wheel [name] 
+                                (I think the wheel group should give 
+                                 our user permission to use sudo)

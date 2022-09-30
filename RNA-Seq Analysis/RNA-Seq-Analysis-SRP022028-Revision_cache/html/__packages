@@ -36,3 +36,5 @@ devtools
 conflicted
 data.table
 biomaRt
+ggrepel
+EnhancedVolcano

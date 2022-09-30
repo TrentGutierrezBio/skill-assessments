@@ -34,7 +34,7 @@ BiocManager::install("reactome.db")
 BiocManager::install('EnhancedVolcano')
 BiocManager::install("recount3")
 
-library("recount3")
+
 
 library(tidyverse)
 library(BiocManager)
@@ -54,18 +54,14 @@ library(clusterProfiler)
 library(enrichplot)
 library(pathview)
 library(org.Hs.eg.db)
-library(ReactomePA)
-library(reactome.db)
 library(conflicted)
 library(stringr)
 library(fgsea)
 library(data.table)
 library(ggplot2)
-library(rebus)
-library(europepmc)
 library(devtools)
 library(EnhancedVolcano)
-
+library("recount3")
 
 
 BiocManager::install("clusterProfiler")

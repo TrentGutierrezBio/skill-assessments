@@ -21,9 +21,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Research question
 
+This RNA-Seq analysis looks at data from iPSCs derived from patients of 22q11.2 deletion syndrome and how it affects neuronal development and activity pathways. 22q11.2 DS is one of the highest known risk factors for developing schizophrenia (SZ) and research has been limited due to the fact that analyzing developing human brains is inaccessible, that's where Induced Pluripotent Stem Cells (iPSC) come in, they help give researchers a opportunity to grow patient-specific neurons in vitro, and these cells can have the abnormalities needed for the investigation. The data for this analysis will be 8 samples of 14 day old neurons, where 4 are from SZ patients (2 confirmed 22q11.2 DS samples, 2 uncertain patient samples) and 4 controls of normal neurons. 
 
 
-### Data Input
+
 
 ```{r library loading, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
@@ -54,7 +55,7 @@ library(biomaRt)
 library(EnhancedVolcano)
 ```
 
-
+### Data Input
 
 ```{r data input, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 url <- download_study("SRP022028") 
@@ -72,8 +73,9 @@ metadata$genotype <- grepl("22q11", metadata$title) %>%
   ifelse("22q11Del","WT")
 ```
 
+This is the metadata for our RNA-Seq analysis, the rest of the analysis will use this data to identify what each sample is. 
 
-```{r metadata table, message=FALSE, warning=FALSE}
+```{r metadata table, echo=TRUE, message=FALSE, warning=FALSE}
 metadata %>% 
   as.data.frame() %>%
   dplyr::select(genotype,conditions) %>%
@@ -82,14 +84,17 @@ metadata %>%
 ```
 
 ```{r DESeq2 analysis start, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
-rse_gene$condition <- metadata$conditions 
 rse_gene$genotype  <- metadata$genotype
-rse_gene$condition <- gsub("sample group: patients","patients",rse_gene$condition)
-rse_gene$condition <- gsub("sample group: contol","control",rse_gene$condition)
+
+rse_gene$condition <- metadata$conditions %>%
+  gsub(pattern = "sample group: patients", replacement = "patients") %>%
+  gsub(pattern = "sample group: contol", replacement = "control")  
 
 dds <- DESeqDataSet(rse_gene, design = ~condition)
 dds <- DESeq(dds)
 ```
+
+
 
 ```{r dds result extraction, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 result <- results(dds, contrast = c("condition","patients","control"))
@@ -103,7 +108,8 @@ result_dataframe <- as.data.frame(result)
 
 ### Exploratory Analysis 
 
-```{r PCA plot, message=FALSE, warning=FALSE}
+### PCA Plot
+```{r PCA plot, echo=TRUE, message=FALSE, warning=FALSE}
 vsd_dds <- vst(dds)
 
 plotPCA(vsd_dds, intgroup = c("condition","genotype"))
@@ -116,8 +122,7 @@ plotPCA(vsd_dds, intgroup = c("condition","genotype"))
 
 
 
-
-```{r signifcant DEGs selection, cache=TRUE}
+```{r signifcant DEGs selection, cache=TRUE, include=FALSE}
 orderedresults <- result[order(result$stat),]
 
 sigresults <- subset(orderedresults, padj < 0.05)
@@ -126,29 +131,40 @@ sigresults_dataframe <- as.data.frame(sigresults)
 ```
 
 
-```{r Gene symbol ID selection, cache=TRUE}
+```{r Gene symbol ID selection, cache=TRUE, include=FALSE}
 
 
 ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
 
-ensemblID <- rownames(sigresults_dataframe)
-ensemblID <- str_replace(ensemblID,
-                          pattern = "\\..*", 
-                          replacement = "")
+sigresults_dataframe_symbols <- sigresults_dataframe
+rownames(sigresults_dataframe_symbols) <- str_replace(rownames(sigresults_dataframe), pattern = "\\..*", replacement = "")
 
-#ERROR ERROR ERROR, For some reason ensemblID has 699 values, but the sigresult_gene_id returns 689 values, and some genes don't have a gene name associated. 
+ensemblID <- rownames(sigresults_dataframe_symbols)
+
 sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
                            filters = "ensembl_gene_id",
                            values = ensemblID,
                            mart = ensembl)
-rownames(sigresults_dataframe) <- sigresult_gene_id$hgnc_symbol
+
+#The two data frames had different row counts, so I thought that using the merge() function would be a good idea, the first thing I did was give the two data frame identical columns.
+#Then I merged the two data frames by the ID column with the all.x argument so the correct gene symbols line up to their ID. 
+#The new merged data frame is pretty long, so I transmuted the data frame into only the important columns and reordered the frame so that the gene symbols will be the first thing 
+#we see. The new data frame is also arranged in descending order by the stat value for easier reading. 
+sigresults_dataframe_symbols$ID <- rownames(sigresults_dataframe_symbols)
+sigresult_gene_id$ID <- sigresult_gene_id$ensembl_gene_id
+
+sigresults_dataframe_symbols_merge <- merge(x =sigresults_dataframe_symbols, y=sigresult_gene_id, by = "ID", all.x=TRUE)
+
+sigresults_dataframe_symbols_merge <- sigresults_dataframe_symbols_merge %>% 
+  dplyr::transmute(gene_symbol=hgnc_symbol,ID,log2FoldChange,stat,pvalue,padj) %>%
+  dplyr::arrange(desc(stat)) 
 
 ```
 
+### Significant DEGs table
 
-```{r sig DEGs datatable}
-datatable(sigresults_dataframe, class = 'cell-border stripe' , 
-          colnames = c("Gene Symbol" = 1), 
+```{r sig DEGs datatable, echo=TRUE, message=FALSE, warning=FALSE}
+datatable(sigresults_dataframe_symbols_merge, class = 'cell-border stripe' , 
           caption = "Table 1: Patient vs Control Significant Genes")
 ```
 
@@ -157,60 +173,82 @@ datatable(sigresults_dataframe, class = 'cell-border stripe' ,
 
 
 
+### Enhanced Volcano plot
+
 
 ```{r enhanced Volcano plot, message=FALSE, warning=FALSE}
-results_treshold_dataframe <- data.frame(result_dataframe) %>%
-  dplyr::mutate(threshold = padj < 0.05)
-
-EnhancedVolcano(result_treshold_dataframe, 
-                lab = rownames(result_treshold_dataframe),
+EnhancedVolcano(sigresults_dataframe_symbols_merge, 
+                lab = sigresults_dataframe_symbols_merge$gene_symbol,
                 x = 'log2FoldChange',
-                y = 'pvalue')
-
-
-```
-
-
-```{r Other Volcano plot, message=FALSE, warning=FALSE}
-
-ggplot(result_treshold_dataframe) + 
-  geom_point(aes(x = log2FoldChange, y= -log10(padj), col = threshold)) + 
-  xlim(c(-10,10))+
-  ylim(c(0,15))+
-  labs(
-    x = "log2 Fold Change" , 
-    y = "-log10 adjusted p-value" , 
-    title = "Volcano plot of signifcant DEGs") +
-  theme(legend.position = "bottom", plot.title = element_text(size = rel(1.5), hjust = 0.5), 
-              axis.title = element_text(size = rel(1.25)))
+                y = 'pvalue',
+                title ="volcano Slot of Signifcant DEGs",
+                xlim = c(-30,30),
+                ylim = c(0,20),
+                pCutoff = 0.05,
+                FCcutoff = 0.5,
+                pointSize = 2.0,
+                labSize = 3.0 )
 ```
 
 
 
-```{r heatmap}
 
-topover <- sigresults_dataframe %>% slice_max(stat, n = 10)
-topunder <- sigresults_dataframe %>% slice_min(stat, n = 10)
+### Heatmap
 
-topoverandunder <- rbind(topover,topunder) 
+
+```{r heatmap data input, cache=TRUE, include=FALSE}
+
+topover <- dplyr::slice_max(sigresults_dataframe,n = 10, order_by = stat)
+topunder <- dplyr::slice_min(sigresults_dataframe,n = 10, order_by = stat)
+exprdata <- rbind(topover,topunder)
 
 normalized_dds_counts <- counts(dds, normalized=TRUE)
-sig_norm_dds_counts <- normalized_dds_counts[rownames(topoverandunder), ]
+sig_norm_dds_counts <- normalized_dds_counts[rownames(exprdata),]
 
-heat_colors <- brewer.pal(n = 6, name = "YlOrRd")
+sig_norm_dds_counts
+
+
+
 
 heatmeta <- as.data.frame(metadata) %>%
   dplyr::select(conditions,genotype)
 
-pheatmap(sig_norm_dds_counts, 
-         color = heat_colors, 
-         cluster_rows = TRUE, 
-         show_rownames = TRUE,
-         annotation = dplyr::select(heatmeta,conditions), 
-         scale = "row")
+
+
+vsd <- vst(dds)
+sampledist <- dist(t(assay(vsd)))
+sampledistmatrix <- as.matrix(sampledist)
+
+rownames(sampledistmatrix) <- paste(vsd$condition, vsd$genotype, sep="-")
+colnames(sampledistmatrix) <- NULL
+
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+
 ```
 
-```{r Clusterprofiler set up as backup, include=FALSE, cache=TRUE}
+
+
+```{r heatmap plot, message=FALSE, warning=FALSE}
+heatmap <- pheatmap(sig_norm_dds_counts,
+                    color = colors,
+                    cluster_rows = FALSE,
+                    show_rownames = FALSE,
+                    annotation = dplyr::select(heatmeta,conditions),
+                    scale = "row")
+```
+
+
+NOTE: I think a heatmap like this would be better used at the beginning of the paper, it looks like exploratory data. 
+```{r Heatmap sample to sample distances, message=FALSE, warning=FALSE}
+distheatmap <- pheatmap(sampledistmatrix,
+                        clustering_distance_rows=sampledist,
+                        clustering_distance_cols=sampledist,
+                        col=colors)
+```
+
+
+
+```{r Clusterprofiler set up as backup, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 
 fullensemblID <- rownames(result_dataframe)
 fullensemblID <- str_replace(fullensemblID,
@@ -225,24 +263,38 @@ gene_list <- sort(gene_list, decreasing = TRUE)
 
 ```
 
-
-
-```{r Gene mapped, message=FALSE, warning=FALSE, cache=TRUE}
+```{r Gene mapped, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 gse <- gseGO(geneList = gene_list , ont = "ALL",
              keyType = "ENSEMBL",
              pvalueCutoff = 0.05, verbose = TRUE,
              OrgDb= "org.Hs.eg.db", pAdjustMethod = "holm")
 ```
 
+### GSEA2 Plot for Top 5 Overexpressed and Underexpressed DEGs 
 
-```{r GSEA2 Plot}
-GSEAplot <- c %>%
-  gseaplot2(geneSetID = 1:5)
-GSEAplot
+#### Top 5 Overexpressed Pathways
+
+
+```{r GSEA2 Plot overexpressed, message=FALSE, warning=FALSE}
+overGSEAplot <- gse %>%
+  arrange(rank) %>%
+  gseaplot2(geneSetID = 1:5, title = "Top 5 Overexpressed Pathways")
+overGSEAplot
 ```
 
+#### Top 5 Underexpressed
 
 
 
+```{r GSEA2 Plot underexpressed, message=FALSE, warning=FALSE}
+underGSEAplot <- gse %>%
+  arrange(desc(rank)) %>%
+  gseaplot2(geneSetID = 1:5, title = "Top 5 Underexpressed Pathways")
+underGSEAplot
+```
 
+Discussion: 
 
+Conclusion: 
+
+References: 

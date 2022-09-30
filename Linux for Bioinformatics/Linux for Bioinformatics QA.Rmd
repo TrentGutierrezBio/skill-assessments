@@ -37,6 +37,70 @@ Q5: What editor did you use and what was the command to save your file changes?
 A5: `nano hello_world.txt` and then changed "world" to "Linux" and used ctrl-x  
     to exit and saved my changes with y, and left the file's name alone. 
 
+Q6. What is the error?
+A6: Server refused our key 
+    No Supported authentication methods available
+
+Q7. What was the solution?
+A7:
+
+Q8. what does the sudo docker run part of the command do? and what does the salmon swim part of the command do?
+A8:
+
+Q9. What is the output of this command?
+A9:
+
+Q10. What is the output of flask --version?
+A10:
+
+Q11. What is the output of mamba -V?
+A11:
+
+Q12. What is the output of which python?
+A12:
+
+Q13. What is the output of which python now?
+A13:
+
+Q14. What is the output of salmon -h?
+A14:
+
+Q15. What does the -o athal.fa.gz part of the command do?
+A15:
+
+Q16. What is a .gz file?
+A16:
+
+Q17. What does the zcat command do?
+A17:
+
+Q18. what does the head command do?
+A18:
+
+Q19. what does the number 100 signify in the command?
+A19:
+
+Q20. What is | doing? -- Hint using | in Linux is called "piping"
+A20:
+
+Q21. What is a .fa file? What is this file format used for?
+A21:
+
+Q22. What format are the downloaded sequencing reads in? 
+A22:
+
+Q23. What is the total size of the disk?
+A23:
+
+Q24. How much space is remaining on the disk?
+A24:
+
+Q25. What went wrong?
+A25:
+
+
+
+
 
 
 
