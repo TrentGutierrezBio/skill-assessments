@@ -100,6 +100,9 @@ dds <- DESeq(dds)
 result <- results(dds, contrast = c("condition","patients","control"))
 
 result_dataframe <- as.data.frame(result)
+
+fullensemblID <- rownames(result_dataframe) %>%
+  str_replace(pattern = "\\..*",replacement = "")
 ```
 
 
@@ -123,48 +126,40 @@ plotPCA(vsd_dds, intgroup = c("condition","genotype"))
 
 
 ```{r signifcant DEGs selection, cache=TRUE, include=FALSE}
-orderedresults <- result[order(result$stat),]
-
-sigresults <- subset(orderedresults, padj < 0.05)
-sigresults_dataframe <- as.data.frame(sigresults)
-
+sigresults_df <- result %>%
+  as.data.frame() %>%
+  dplyr::mutate(ID = gsub(pattern = "\\..*", replacement = "", x= rownames(result))) %>%
+  dplyr::relocate(ID,baseMean) %>%
+  arrange(desc(stat)) %>%
+  subset(padj < 0.05) 
 ```
 
 
 ```{r Gene symbol ID selection, cache=TRUE, include=FALSE}
-
-
 ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
-
-sigresults_dataframe_symbols <- sigresults_dataframe
-rownames(sigresults_dataframe_symbols) <- str_replace(rownames(sigresults_dataframe), pattern = "\\..*", replacement = "")
-
-ensemblID <- rownames(sigresults_dataframe_symbols)
 
 sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
                            filters = "ensembl_gene_id",
-                           values = ensemblID,
-                           mart = ensembl)
+                           values = sigresults_df$ID,
+                           mart = ensembl) %>%
+                     dplyr::rename(ID = ensembl_gene_id, 
+                                   Gene_name = hgnc_symbol)
 
-#The two data frames had different row counts, so I thought that using the merge() function would be a good idea, the first thing I did was give the two data frame identical columns.
-#Then I merged the two data frames by the ID column with the all.x argument so the correct gene symbols line up to their ID. 
-#The new merged data frame is pretty long, so I transmuted the data frame into only the important columns and reordered the frame so that the gene symbols will be the first thing 
-#we see. The new data frame is also arranged in descending order by the stat value for easier reading. 
-sigresults_dataframe_symbols$ID <- rownames(sigresults_dataframe_symbols)
-sigresult_gene_id$ID <- sigresult_gene_id$ensembl_gene_id
+sigresults_df <- left_join(sigresults_df,sigresult_gene_id, by= "ID") %>%
+  dplyr::relocate(Gene_name,baseMean) %>%
+  dplyr::select(ID,Gene_name,log2FoldChange,stat,pvalue,padj)
 
-sigresults_dataframe_symbols_merge <- merge(x =sigresults_dataframe_symbols, y=sigresult_gene_id, by = "ID", all.x=TRUE)
-
-sigresults_dataframe_symbols_merge <- sigresults_dataframe_symbols_merge %>% 
-  dplyr::transmute(gene_symbol=hgnc_symbol,ID,log2FoldChange,stat,pvalue,padj) %>%
-  dplyr::arrange(desc(stat)) 
-
+# Removes the rows with No gene names, not sure which we would prefer for the data table. If I had to guess I would assume we would want a table with Gene names so the results are more straightforward and we at least know each ensemble ID is unique and doesn't have a chance of associated with another ID.   
+sigresults_df_filtered <- sigresults_df %>%
+  drop_na(Gene_name) %>%
+  dplyr::filter(Gene_name != "")
+  
 ```
 
 ### Significant DEGs table
 
 ```{r sig DEGs datatable, echo=TRUE, message=FALSE, warning=FALSE}
-datatable(sigresults_dataframe_symbols_merge, class = 'cell-border stripe' , 
+datatable(sigresults_df_filtered, class = 'cell-border stripe' , 
           caption = "Table 1: Patient vs Control Significant Genes")
 ```
 
@@ -177,8 +172,8 @@ datatable(sigresults_dataframe_symbols_merge, class = 'cell-border stripe' ,
 
 
 ```{r enhanced Volcano plot, message=FALSE, warning=FALSE}
-EnhancedVolcano(sigresults_dataframe_symbols_merge, 
-                lab = sigresults_dataframe_symbols_merge$gene_symbol,
+EnhancedVolcano(sigresults_df_filtered, 
+                lab = sigresults_df_filtered$Gene_name,
                 x = 'log2FoldChange',
                 y = 'pvalue',
                 title ="volcano Slot of Signifcant DEGs",
@@ -198,20 +193,23 @@ EnhancedVolcano(sigresults_dataframe_symbols_merge,
 
 ```{r heatmap data input, cache=TRUE, include=FALSE}
 
-topover <- dplyr::slice_max(sigresults_dataframe,n = 10, order_by = stat)
-topunder <- dplyr::slice_min(sigresults_dataframe,n = 10, order_by = stat)
+topover <- dplyr::slice_max(sigresults_df_filtered,n = 10, order_by = stat)
+topunder <- dplyr::slice_min(sigresults_df_filtered,n = 10, order_by = stat)
 exprdata <- rbind(topover,topunder)
 
 normalized_dds_counts <- counts(dds, normalized=TRUE)
-sig_norm_dds_counts <- normalized_dds_counts[rownames(exprdata),]
+row.names(normalized_dds_counts) <- str_replace(fullensemblID,
+                          pattern = "\\..*", 
+                          replacement = "")
 
-sig_norm_dds_counts
-
+sig_norm_dds_counts <- normalized_dds_counts[exprdata$ID,]
+row.names(sig_norm_dds_counts) <- (exprdata$Gene_name)
 
 
 
 heatmeta <- as.data.frame(metadata) %>%
   dplyr::select(conditions,genotype)
+
 
 
 
@@ -224,15 +222,19 @@ colnames(sampledistmatrix) <- NULL
 
 colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
 
+cols <- brewer.pal(9, "PuRd")
+  
+palette <- colorRampPalette(cols)
+
 ```
 
 
 
 ```{r heatmap plot, message=FALSE, warning=FALSE}
 heatmap <- pheatmap(sig_norm_dds_counts,
-                    color = colors,
-                    cluster_rows = FALSE,
-                    show_rownames = FALSE,
+                    color = palette(20),
+                    cluster_rows = TRUE,
+                    show_rownames = TRUE,
                     annotation = dplyr::select(heatmeta,conditions),
                     scale = "row")
 ```
@@ -250,10 +252,13 @@ distheatmap <- pheatmap(sampledistmatrix,
 
 ```{r Clusterprofiler set up as backup, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 
-fullensemblID <- rownames(result_dataframe)
-fullensemblID <- str_replace(fullensemblID,
-                          pattern = "\\..*", 
-                          replacement = "")
+#gene_list <- result_dataframe$stat %>%
+  #names(gene_list) <- make.names(names(fullensemblID)) %>%
+  #as_tibble() %>%
+  #dplyr::mutate(ID = fullensemblID) %>%
+  #drop_na() %>%
+  #dplyr::arrange(desc(value))
+  
 
 
 original_gene_list <- result_dataframe$stat
