@@ -20,11 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 
 ### Research question
-
-This RNA-Seq analysis looks at data from iPSCs derived from patients of 22q11.2 deletion syndrome and how it affects neuronal development and activity pathways. 22q11.2 DS is one of the highest known risk factors for developing schizophrenia (SZ) and research has been limited due to the fact that analyzing developing human brains is inaccessible, that's where Induced Pluripotent Stem Cells (iPSC) come in, they help give researchers a opportunity to grow patient-specific neurons in vitro, and these cells can have the abnormalities needed for the investigation. The data for this analysis will be 8 samples of 14 day old neurons, where 4 are from SZ patients (2 confirmed 22q11.2 DS samples, 2 uncertain patient samples) and 4 controls of normal neurons. 
-
-
-
+This RNA-Seq analysis looks at induced pluripotent stem cells (iPSCs) derived neurons from patients of Schizophrenia and Schizo-affective disorder that also had 22q11.2 deletion syndrome which is one of the most common risk factors for the development of Schizophrenia. The control group is neurons from healthy individuals. The researchers who collected this data were investigating if samples from patients with 22q11.2 DS could serve as a useful genetic pattern for further Schizophrenia research.  
 
 ```{r library loading, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
@@ -73,15 +69,18 @@ metadata$genotype <- grepl("22q11", metadata$title) %>%
   ifelse("22q11Del","WT")
 ```
 
-This is the metadata for our RNA-Seq analysis, the rest of the analysis will use this data to identify what each sample is. 
+Disclaimer: The original data-set has 18 samples, however during the data acquisition only 8 samples could be downloaded for analysis. 
+
+The metadata shows us which samples are from the patients and controls, and what genotypes the samples also have. 
 
 ```{r metadata table, echo=TRUE, message=FALSE, warning=FALSE}
 metadata %>% 
   as.data.frame() %>%
   dplyr::select(genotype,conditions) %>%
-  kbl(caption = "Metadata for SRP022028") %>%
+  kbl(caption = "Table 1: Metadata for SRP022028") %>%
   kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
 ```
+
 
 ```{r DESeq2 analysis start, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 rse_gene$genotype  <- metadata$genotype
@@ -95,7 +94,6 @@ dds <- DESeq(dds)
 ```
 
 
-
 ```{r dds result extraction, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 result <- results(dds, contrast = c("condition","patients","control"))
 
@@ -106,14 +104,41 @@ fullensemblID <- rownames(result_dataframe) %>%
 ```
 
 
-
 ## Results
 
 ### Exploratory Analysis 
 
-### PCA Plot
-```{r PCA plot, echo=TRUE, message=FALSE, warning=FALSE}
+```{r sample to sample dist data input, message=FALSE, warning=FALSE, include=FALSE}
+sampledist <- vst(dds) %>%
+  assay() %>%
+  t() %>%
+  dist()
+
+
+sampledistmatrix <- as.matrix(sampledist)
+
 vsd_dds <- vst(dds)
+
+rownames(sampledistmatrix) <- paste(vsd_dds$condition, vsd_dds$genotype, sep="-")
+colnames(sampledistmatrix) <- NULL
+
+colsBlue <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+```
+### Sample-to-Sample dist Heatmap
+
+To begin our analysis we want to view how similar our samples are to each other. In this dist Heatmap our samples cluster in a expected way, 3 controls are close to each other while the 4 patient samples are similar to their group. One interesting observation is that one control-WT sample is very similar to the patient samples. 
+```{r Heatmap sample to sample distances, echo=TRUE, message=FALSE, warning=FALSE}
+distheatmap <- pheatmap(sampledistmatrix,
+                        clustering_distance_rows=sampledist,
+                        clustering_distance_cols=sampledist,
+                        col=colsBlue)
+```
+
+
+### PCA Plot
+
+This PCA plot helps us continue our sample clustering analysis, here we can see a control-WT close to the patient groups again. And the rest of the groups seem to be separated. 
+```{r PCA plot, echo=TRUE, message=FALSE, warning=FALSE}
 
 plotPCA(vsd_dds, intgroup = c("condition","genotype"))
 ```
@@ -122,9 +147,6 @@ plotPCA(vsd_dds, intgroup = c("condition","genotype"))
 
 
 ### Statistical Analysis 
-
-
-
 ```{r signifcant DEGs selection, cache=TRUE, include=FALSE}
 sigresults_df <- result %>%
   as.data.frame() %>%
@@ -133,7 +155,6 @@ sigresults_df <- result %>%
   arrange(desc(stat)) %>%
   subset(padj < 0.05) 
 ```
-
 
 ```{r Gene symbol ID selection, cache=TRUE, include=FALSE}
 ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
@@ -149,7 +170,7 @@ sigresults_df <- left_join(sigresults_df,sigresult_gene_id, by= "ID") %>%
   dplyr::relocate(Gene_name,baseMean) %>%
   dplyr::select(ID,Gene_name,log2FoldChange,stat,pvalue,padj)
 
-# Removes the rows with No gene names, not sure which we would prefer for the data table. If I had to guess I would assume we would want a table with Gene names so the results are more straightforward and we at least know each ensemble ID is unique and doesn't have a chance of associated with another ID.   
+# Removes the rows with No gene names, not sure which we would prefer for the data table. If I had to guess I would assume we would want a table with Gene names so the results are more straightforward and we at least know each ensemble ID is unique and doesn't have a chance of overlapping with another gene name.    
 sigresults_df_filtered <- sigresults_df %>%
   drop_na(Gene_name) %>%
   dplyr::filter(Gene_name != "")
@@ -158,38 +179,35 @@ sigresults_df_filtered <- sigresults_df %>%
 
 ### Significant DEGs table
 
+This table list the Genes that have a adjusted p-value lower than 0.05, and sorted in descending order by the stat column. For this analysis we ended up with 493 significant DEGs. 
 ```{r sig DEGs datatable, echo=TRUE, message=FALSE, warning=FALSE}
 datatable(sigresults_df_filtered, class = 'cell-border stripe' , 
-          caption = "Table 1: Patient vs Control Significant Genes")
+          caption = "Table 2: Patient vs Control Condition Significant Genes")
 ```
-
-
-
 
 
 
 ### Enhanced Volcano plot
 
-
-```{r enhanced Volcano plot, message=FALSE, warning=FALSE}
+This volcano plot shows all of the significant DEGs, there is 5 clear groups of genes that seem to be split up mostly by their log2 Fold change, in the middle from (-5,5) contains the majority of DEGs, then is a little farther out is (-10) and (10), and at both ends we have the final 2 groups, (-20) and (20) which could show the genes that are the most overexpressed and underexpressed. The Fold Change cut off was adjusted to just leave the over- groups labeled since they might have the most interesting data to look into. 
+```{r enhanced Volcano plot, echo=TRUE, message=FALSE, warning=FALSE}
 EnhancedVolcano(sigresults_df_filtered, 
                 lab = sigresults_df_filtered$Gene_name,
                 x = 'log2FoldChange',
                 y = 'pvalue',
                 title ="volcano Slot of Signifcant DEGs",
-                xlim = c(-30,30),
-                ylim = c(0,20),
+                xlim = c(-28,28),
+                ylim = c(0,17),
                 pCutoff = 0.05,
-                FCcutoff = 0.5,
-                pointSize = 2.0,
-                labSize = 3.0 )
+                FCcutoff = 22,
+                pointSize = 1.5,
+                labSize = 2 )
 ```
 
 
 
 
-### Heatmap
-
+### Heatmap of the top 10 overexpressed and top 10 underexpressed DEGs
 
 ```{r heatmap data input, cache=TRUE, include=FALSE}
 
@@ -211,26 +229,15 @@ heatmeta <- as.data.frame(metadata) %>%
   dplyr::select(conditions,genotype)
 
 
-
-
-vsd <- vst(dds)
-sampledist <- dist(t(assay(vsd)))
-sampledistmatrix <- as.matrix(sampledist)
-
-rownames(sampledistmatrix) <- paste(vsd$condition, vsd$genotype, sep="-")
-colnames(sampledistmatrix) <- NULL
-
-colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
-
-cols <- brewer.pal(9, "PuRd")
+colsRdBu <- brewer.pal(11, "RdBu")
   
-palette <- colorRampPalette(cols)
+palette <- colorRampPalette(colsRdBu)
 
 ```
 
 
 
-```{r heatmap plot, message=FALSE, warning=FALSE}
+```{r heatmap plot, echo=TRUE, message=FALSE, warning=FALSE}
 heatmap <- pheatmap(sig_norm_dds_counts,
                     color = palette(20),
                     cluster_rows = TRUE,
@@ -239,32 +246,12 @@ heatmap <- pheatmap(sig_norm_dds_counts,
                     scale = "row")
 ```
 
+```{r Clusterprofiler set up, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
 
-NOTE: I think a heatmap like this would be better used at the beginning of the paper, it looks like exploratory data. 
-```{r Heatmap sample to sample distances, message=FALSE, warning=FALSE}
-distheatmap <- pheatmap(sampledistmatrix,
-                        clustering_distance_rows=sampledist,
-                        clustering_distance_cols=sampledist,
-                        col=colors)
-```
-
-
-
-```{r Clusterprofiler set up as backup, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
-
-#gene_list <- result_dataframe$stat %>%
-  #names(gene_list) <- make.names(names(fullensemblID)) %>%
-  #as_tibble() %>%
-  #dplyr::mutate(ID = fullensemblID) %>%
-  #drop_na() %>%
-  #dplyr::arrange(desc(value))
-  
-
-
-original_gene_list <- result_dataframe$stat
-names(original_gene_list) <- fullensemblID
-gene_list <- na.omit(original_gene_list)
-gene_list <- sort(gene_list, decreasing = TRUE)
+gene_list <- result_dataframe$stat %>%
+  setNames(object = ,fullensemblID) %>%
+  na.omit() %>%
+  sort(decreasing = TRUE)
 
 ```
 
@@ -277,21 +264,16 @@ gse <- gseGO(geneList = gene_list , ont = "ALL",
 
 ### GSEA2 Plot for Top 5 Overexpressed and Underexpressed DEGs 
 
-#### Top 5 Overexpressed Pathways
 
-
-```{r GSEA2 Plot overexpressed, message=FALSE, warning=FALSE}
+Here we have 2 GESA plots, one for the overexpressed pathways, and one for the underexpressed pathways. For this graph we have the top 5 overexpressed pathways which mean in neurons from patients who are at risk 
+```{r GSEA2 Plot overexpressed, echo=TRUE, message=FALSE, warning=FALSE}
 overGSEAplot <- gse %>%
   arrange(rank) %>%
   gseaplot2(geneSetID = 1:5, title = "Top 5 Overexpressed Pathways")
 overGSEAplot
 ```
 
-#### Top 5 Underexpressed
-
-
-
-```{r GSEA2 Plot underexpressed, message=FALSE, warning=FALSE}
+```{r GSEA2 Plot underexpressed, echo=TRUE, message=FALSE, warning=FALSE}
 underGSEAplot <- gse %>%
   arrange(desc(rank)) %>%
   gseaplot2(geneSetID = 1:5, title = "Top 5 Underexpressed Pathways")
@@ -302,4 +284,3 @@ Discussion:
 
 Conclusion: 
 
-References: 

@@ -237,6 +237,19 @@ The gseaplot2 graph shows the enrichment scores for the top 5 pathways sorted by
  
 ## Conclusion
 
+This has code from the DESeq2 vignette, the bottom code. In order to tidy (pipe) we have to apporach by specifying our inputs and then run all the outputs right after. 
+```{r}
+sampledistmatrix <- vst(dds) %>%
+  assay() %>%
+  t() %>%
+  dist() %>%
+  as.matrix()
+
+vsd <- vst(dds)
+sampledist <- dist(t(assay(vsd)))
+sampledistmatrix <- as.matrix(sampledist)
+
+```
 
 
 
