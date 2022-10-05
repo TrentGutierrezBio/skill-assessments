@@ -25,48 +25,57 @@ dim(rse_gene_SRP068912)
 
 MatrixGenerics::rowRanges(rse_gene_SRP068912)
 
+# Once you have your RSE object, you can transform the raw coverage
+# base-pair coverage counts using transform_counts().
+assay(rse_gene_SRP068912, "counts") <- transform_counts(rse_gene_SRP068912)
+
+metadata(rse_gene_SRP068912)
+
 recount3_cols <- colnames(colData(rse_gene_SRP068912))
 
-# For studies from SRA, we can further extract the SRA attributes
-rse_gene_SRP186857_expanded <-
-  expand_sra_attributes(rse_gene_SRPSRP068912)
+# How many are there?
+length(recount3_cols)
+
+# View the first few ones
+head(recount3_cols)
+
+# Group them by source
+recount3_cols_groups <- table(gsub("\\..*", "", recount3_cols))
+
+# Common sources and number of columns per source
+recount3_cols_groups[recount3_cols_groups > 1]
+
+# Unique columns
+recount3_cols_groups[recount3_cols_groups == 1]
+
+# For studies from SRA, we can further extract the SRA attributes using expand_sra_attributes() as shown below.
+rse_gene_SRP068912_expanded <-
+  expand_sra_attributes(rse_gene_SRP068912)
 colData(rse_gene_SRP068912_expanded)[, ncol(colData(rse_gene_SRP068912)):ncol(colData(rse_gene_SRP068912_expanded))]
 
-metadata <- colData(rse_gene_SRP186857_expanded)
-metadata$conditions <- rse_gene_SRP186857_expanded$sra_attribute.source_name
-
-metadata$conditions <- grepl("control",metadata$conditions) %>%
-                       ifelse("Control","Treated") 
-
-metadata$genotype <- metadata$sra_attribute.cell_line
+recount3_cols
 
 
+metadata_treatment <- colData(rse_gene_SRP068912_expanded)
 
+metadata_treatment$genotype <- metadata_treatment$sra_attribute.cell_line
 
-metadata %>% 
+metadata_treatment$condition <- grepl("control",metadata_treatment$sra_attribute.source_name) %>%
+                                ifelse("control","treated")
+
+colData(metadata_treatment)
+
+metadata_treatment %>% 
   as.data.frame() %>%
-  dplyr::select(genotype,conditions) %>%
-  kbl(caption = "Metadata for SRP186857") %>%
+  dplyr::select(genotype,condition) %>%
+  kbl(caption = "Table 1: Metadata for SRP068912") %>%
   kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
 
-rse_gene_SRP186857_expanded$condition <- metadata$conditions 
-rse_gene_SRP186857_expanded$genotype  <- metadata$genotype
 
-dds <- DESeqDataSet(rse_gene_SRP186857_expanded, design = ~condition)
+
+rse_gene_SRP068912_expanded$genotype  <- metadata_treatment$genotype
+rse_gene_SRP068912_expanded$condition <- metadata_treatment$condition
+
+dds <- DESeqDataSet(rse_gene_SRP068912_expanded, design = ~condition)
 dds <- DESeq(dds)
-
-result <- results(dds, contrast = c("condition","Treated","Control"))
-
-result_dataframe <- as.data.frame(result)
-
-
-colData <- colData(rse_gene_SRP186857) %>% as.data.frame()
-countData <- assays(rse_gene_SRP186857)$raw_counts %>% as.data.frame()
-
-head(rownames(colData) == colnames(countData))
-
-colData <- colData %>%
-  dplyr::filter(sra.run_acc)
-
-
-
+ 

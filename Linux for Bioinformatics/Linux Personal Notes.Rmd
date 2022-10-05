@@ -17,3 +17,6 @@ to add a password to a user: $ sudo passwd [name]
 to give our user Sudo access: $ sudo usermod -a -G wheel [name] 
                                 (I think the wheel group should give 
                                  our user permission to use sudo)
+                                 
+add a home directory for our user: $sudo mkhomedir_helper [name]
+                                   $pwd (to double check if it worked)

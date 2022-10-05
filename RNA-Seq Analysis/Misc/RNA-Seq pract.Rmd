@@ -1,0 +1,318 @@
+---
+title: "additional RNA-Seq Pract"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(BiocManager)
+library(recount)
+library(RColorBrewer)
+library(pheatmap)
+library(DT)
+library(DESeq2)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+library(fgsea)
+library(stats)
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Hs.eg.db)
+library(devtools)
+library(conflicted)
+library(stringr)
+library(fgsea)
+library(data.table)
+library(biomaRt)
+library(EnhancedVolcano)
+```
+
+
+
+```{r}
+url <- download_study("SRP014027") 
+load(file.path("SRP014027", 'rse_gene.Rdata'))
+```
+
+```{r}
+metadata <- colData(rse_gene)
+
+metadata$conditions <- sapply(metadata$characteristics, function(x){x[3]}) %>%
+                       grepl(pattern = "control") %>%
+                       ifelse("control","treatment")
+
+metadata$genotype <- grepl("Gata6Hopx",rse_gene$title) %>%
+                     ifelse("Gata6Hopx","WT")
+```
+
+```{r}
+metadata %>% 
+  as.data.frame() %>%
+  dplyr::select(genotype,conditions) %>%
+  kbl(caption = "Table 1: Metadata for SRP014027") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
+```
+
+```{r}
+rse_gene$genotype  <- metadata$genotype
+
+rse_gene$condition <- metadata$conditions
+
+dds <- DESeqDataSet(rse_gene, design = ~condition)
+dds <- DESeq(dds)
+```
+
+```{r}
+result <- results(dds, contrast = c("condition","treatment","control"))
+
+result_dataframe <- as.data.frame(result)
+
+fullensemblID <- rownames(result_dataframe) %>%
+  str_replace(pattern = "\\..*",replacement = "")
+```
+
+```{r}
+sampledist <- vst(dds) %>%
+  assay() %>%
+  t() %>%
+  dist()
+
+
+sampledistmatrix <- as.matrix(sampledist)
+
+vsd_dds <- vst(dds)
+
+rownames(sampledistmatrix) <- paste(vsd_dds$condition, vsd_dds$genotype, sep="-")
+colnames(sampledistmatrix) <- NULL
+
+colsBlue <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+```
+
+```{r}
+distheatmap <- pheatmap(sampledistmatrix,
+                        clustering_distance_rows=sampledist,
+                        clustering_distance_cols=sampledist,
+                        col=colsBlue)
+```
+
+```{r}
+plotPCA(vsd_dds, intgroup = c("condition","genotype"))
+```
+
+```{r}
+sigresults_df <- result %>%
+  as.data.frame() %>%
+  dplyr::mutate(ID = gsub(pattern = "\\..*", replacement = "", x= rownames(result))) %>%
+  dplyr::relocate(ID,baseMean) %>%
+  arrange(desc(stat)) %>%
+  subset(padj < 0.05) 
+```
+
+```{r}
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+
+sigresult_gene_id <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
+                           filters = "ensembl_gene_id",
+                           values = sigresults_df$ID,
+                           mart = ensembl) %>%
+  dplyr::rename(ID = ensembl_gene_id, 
+                Gene_name = hgnc_symbol)
+
+sigresults_df <- left_join(sigresults_df,sigresult_gene_id, by= "ID") %>%
+  dplyr::relocate(Gene_name,baseMean) %>%
+  dplyr::select(ID,Gene_name,log2FoldChange,stat,pvalue,padj)
+
+sigresults_df_filtered <- sigresults_df %>%
+  drop_na(Gene_name) %>%
+  dplyr::filter(Gene_name != "")
+```
+
+```{r}
+datatable(sigresults_df_filtered, class = 'cell-border stripe' , 
+          caption = "Table 2: Patient vs Control Condition Significant Genes")
+```
+
+```{r}
+EnhancedVolcano(sigresults_df_filtered, 
+                lab = sigresults_df_filtered$Gene_name,
+                x = 'log2FoldChange',
+                y = 'pvalue',
+                title ="volcano Slot of Signifcant DEGs",
+                xlim = c(-10,10),
+                ylim = c(0,20),
+                pCutoff = 0.05,
+                FCcutoff = 0.5,
+                pointSize = 1.5,
+                labSize = 2 )
+```
+
+```{r}
+
+topover <- dplyr::slice_max(sigresults_df_filtered,n = 10, order_by = stat)
+topunder <- dplyr::slice_min(sigresults_df_filtered,n = 10, order_by = stat)
+exprdata <- rbind(topover,topunder)
+
+normalized_dds_counts <- counts(dds, normalized=TRUE)
+row.names(normalized_dds_counts) <- str_replace(fullensemblID,
+                                                pattern = "\\..*", 
+                                                replacement = "")
+
+sig_norm_dds_counts <- normalized_dds_counts[exprdata$ID,]
+row.names(sig_norm_dds_counts) <- (exprdata$Gene_name)
+
+
+
+heatmeta <- as.data.frame(metadata) %>%
+  dplyr::select(conditions,genotype)
+
+
+colsRdBu <- brewer.pal(11, "RdBu")
+
+palette <- colorRampPalette(colsRdBu)
+```
+
+```{r}
+heatmap <- pheatmap(sig_norm_dds_counts,
+                    color = palette(20),
+                    cluster_rows = TRUE,
+                    show_rownames = TRUE,
+                    annotation = dplyr::select(heatmeta,conditions),
+                    scale = "row") 
+```
+
+```{r}
+gene_list <- result_dataframe$stat %>%
+  setNames(object = ,fullensemblID) %>%
+  na.omit() %>%
+  sort(decreasing = TRUE)
+```
+
+```{r}
+gse <- gseGO(geneList = gene_list , ont = "ALL",
+             keyType = "ENSEMBL",
+             pvalueCutoff = 0.05, verbose = TRUE,
+             OrgDb= "org.Hs.eg.db", pAdjustMethod = "holm")
+```
+
+```{r}
+overGSEAplot <- gse %>%
+  arrange(desc(rank)) %>%
+  gseaplot2(geneSetID = 1:5, title = "Top 5 Overexpressed Pathways")
+overGSEAplot
+```
+
+```{r}
+underGSEAplot <- gse %>%
+  arrange(rank) %>%
+  gseaplot2(geneSetID = 1:5, title = "Top 5 Underexpressed Pathways")
+underGSEAplot
+```
+
+```{r}
+
+dotplot(gse, showCategory = 30)
+
+```
+
+
+```{r}
+
+data("geneList")
+
+fold_list <- result_dataframe$log2FoldChange %>%
+  setNames(object = ,fullensemblID) %>%
+  na.omit() %>%
+  sort(decreasing = TRUE)
+
+
+
+edox <- setReadable(gse, 'org.Hs.eg.db','ENSEMBL')
+p1 <- cnetplot(edox, foldChange = fold_list)
+```
+
+
+```{r}
+
+gseep <- pairwise_termsim(gse)
+p2 <- emapplot(gseep)
+
+```
+
+
+```{r}
+
+sigresults_df_filtered$entrez <- mapIds(org.Hs.eg.db,
+                                        keys = sigresults_df_filtered$ID,
+                                        column = "ENTREZID",
+                                        keytype = "ENSEMBL",
+                                        multiVals = "first")
+sigresults_df_filtered$name =   mapIds(org.Hs.eg.db,
+                     keys=sigresults_df_filtered$ID, 
+                     column="GENENAME",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+sigresults_df_filtered$symbol <- sigresults_df_filtered$Gene_name
+
+sigresults_df_filtered <- sigresults_df_filtered %>%
+  na.omit()
+```
+
+
+```{r}
+
+foldchanges = sigresults_df_filtered$log2FoldChange
+names(foldchanges) = sigresults_df_filtered$entrez
+
+keggres = gage(foldchanges, gsets=kegg.sets.hs, same.dir=TRUE)
+lapply(keggres, head)
+```
+
+
+```{r}
+
+keggrespathways = data.frame(id=rownames(keggres$greater), keggres$greater) %>% 
+  tibble::as_tibble() %>% 
+  dplyr::filter(row_number()<= 5) %>% 
+  .$id %>% 
+  as.character()
+keggrespathways
+
+```
+
+```{r}
+
+keggresids = substr(keggrespathways, start=1, stop=8)
+keggresids
+
+```
+
+```{r}
+
+plot_pathway = function(pid) pathview(gene.data=foldchanges, pathway.id=pid, species="hsa", new.signature=FALSE)
+
+
+```
+
+
+```{r}
+
+tmp = sapply(keggresids, function(pid) pathview(gene.data=foldchanges, pathway.id=pid, species="hsa"))
+
+```
+
+```{r}
+
+
+
+```

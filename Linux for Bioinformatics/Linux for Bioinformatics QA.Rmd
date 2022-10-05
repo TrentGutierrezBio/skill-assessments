@@ -42,8 +42,23 @@ A6: Server refused our key
     No Supported authentication methods available
 
 Q7. What was the solution?
-A7:
-
+A7: The solution to this problem was to: 
+    - Create a new key pair for a new pem file
+    - Import the pem file to my local Ubuntu env, using MobaXterm's import feature
+    - Right click the pem file and adjust the settings to be more secure (400, user read only)
+    - Now on another tab, connect via ec2-user 
+    - (Sudouser should be created and password protected) 
+    - switch to the sudouser
+    - create the .ssh directory 
+    - adjust permissions of the folder to 700
+    - create a file named "authorized_keys" 
+    - adjust this file's permissions to 600
+    - nano the key file 
+    - back on Ubuntu: extract the public key from the private pem file
+    - copy and paste this string into the key nano 
+    - save key file 
+    - Now sudouser should be allowed to connect using the new pem key and be password protected. 
+    
 Q8. what does the sudo docker run part of the command do? and what does the salmon swim part of the command do?
 A8:
 

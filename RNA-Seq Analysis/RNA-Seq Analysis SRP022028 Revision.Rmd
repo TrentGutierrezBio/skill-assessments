@@ -209,6 +209,7 @@ EnhancedVolcano(sigresults_df_filtered,
 
 ### Heatmap of the top 10 overexpressed and top 10 underexpressed DEGs
 
+
 ```{r heatmap data input, cache=TRUE, include=FALSE}
 
 topover <- dplyr::slice_max(sigresults_df_filtered,n = 10, order_by = stat)
@@ -236,23 +237,21 @@ palette <- colorRampPalette(colsRdBu)
 ```
 
 
-
+This graph is slightly hard to read (probably due to the data skewing either all the way positive (20+) or all the way negative (-20)) The sample "SRR8366534" might be the problem in this graph since it seems to be expressing 7 genes so much that all the other samples pretty much have no expression relatively. Another interesting pattern is that the 3 patient samples on the left seem to over-express different genes unique to them.  
 ```{r heatmap plot, echo=TRUE, message=FALSE, warning=FALSE}
 heatmap <- pheatmap(sig_norm_dds_counts,
                     color = palette(20),
                     cluster_rows = TRUE,
                     show_rownames = TRUE,
                     annotation = dplyr::select(heatmeta,conditions),
-                    scale = "row")
+                    scale = "row") 
 ```
 
 ```{r Clusterprofiler set up, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
-
 gene_list <- result_dataframe$stat %>%
   setNames(object = ,fullensemblID) %>%
   na.omit() %>%
   sort(decreasing = TRUE)
-
 ```
 
 ```{r Gene mapped, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
@@ -265,22 +264,17 @@ gse <- gseGO(geneList = gene_list , ont = "ALL",
 ### GSEA2 Plot for Top 5 Overexpressed and Underexpressed DEGs 
 
 
-Here we have 2 GESA plots, one for the overexpressed pathways, and one for the underexpressed pathways. For this graph we have the top 5 overexpressed pathways which mean in neurons from patients who are at risk 
+Here we have 2 GESA plots, one for the over-expressed pathways, and one for the under-expressed pathways.The gene This over-expression pathway shows the top 5 pathways having a very similar path, all of them peak around rank ~35,000-40,000. The Enrichment Score peaks at -0.4. 
 ```{r GSEA2 Plot overexpressed, echo=TRUE, message=FALSE, warning=FALSE}
 overGSEAplot <- gse %>%
-  arrange(rank) %>%
+  arrange(desc(rank)) %>%
   gseaplot2(geneSetID = 1:5, title = "Top 5 Overexpressed Pathways")
 overGSEAplot
 ```
-
+This graph has very similar results to our over-expressed graph, 
 ```{r GSEA2 Plot underexpressed, echo=TRUE, message=FALSE, warning=FALSE}
 underGSEAplot <- gse %>%
-  arrange(desc(rank)) %>%
+  arrange(rank) %>%
   gseaplot2(geneSetID = 1:5, title = "Top 5 Underexpressed Pathways")
 underGSEAplot
 ```
-
-Discussion: 
-
-Conclusion: 
-
