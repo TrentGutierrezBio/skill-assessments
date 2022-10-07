@@ -20,3 +20,9 @@ to give our user Sudo access: $ sudo usermod -a -G wheel [name]
                                  
 add a home directory for our user: $sudo mkhomedir_helper [name]
                                    $pwd (to double check if it worked)
+                                  
+                                  
+If you can't delete a user due to a process use: $sudo pkill -KILL -u [user]
+                                                 $sudo deluser ubuntu
+                                                 
+            

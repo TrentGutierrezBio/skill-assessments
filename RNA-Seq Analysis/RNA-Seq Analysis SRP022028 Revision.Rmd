@@ -49,6 +49,7 @@ library(fgsea)
 library(data.table)
 library(biomaRt)
 library(EnhancedVolcano)
+library(gage)
 ```
 
 ### Data Input
@@ -271,7 +272,7 @@ overGSEAplot <- gse %>%
   gseaplot2(geneSetID = 1:5, title = "Top 5 Overexpressed Pathways")
 overGSEAplot
 ```
-This graph has very similar results to our over-expressed graph, 
+This graph has very similar results to our over-expressed graph. 
 ```{r GSEA2 Plot underexpressed, echo=TRUE, message=FALSE, warning=FALSE}
 underGSEAplot <- gse %>%
   arrange(rank) %>%
