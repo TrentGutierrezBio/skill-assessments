@@ -71,59 +71,95 @@ A8.1
 
 
 Q8.2 and what does the salmon swim part of the command do? 
-A8.2:  swim : perform super-secret operation, Im pretty sure this just prints out the salmon fancy text. 
+A8.2:  swim : perform super-secret operation, I'm pretty sure this just prints out the salmon fancy text. 
 
 
 Q9. What is the output of this command?
-A9:
+A9: serveruser is not in the sudoers file.  This incident will be reported.
 
 Q10. What is the output of flask --version?
 A10:
 
+Python 3.9.12
+Flask 2.1.3
+Werkzeug 2.0.3
+
+
 Q11. What is the output of mamba -V?
-A11:
+A11: conda 22.9.0
 
 Q12. What is the output of which python?
-A12:
+A12: /home/serveruser/miniconda3/envs/py27/bin/python
 
 Q13. What is the output of which python now?
-A13:
+A13:/home/serveruser/miniconda3/bin/python
 
 Q14. What is the output of salmon -h?
-A14:
+A14: salmon v1.4.0
+
+Usage:  salmon -h|--help or
+        salmon -v|--version or
+        salmon -c|--cite or
+        salmon [--no-version-check] <COMMAND> [-h | options]
+
+Commands:
+     index      : create a salmon index
+     quant      : quantify a sample
+     alevin     : single cell analysis
+     swim       : perform super-secret operation
+     quantmerge : merge multiple quantifications into a single file
+(salmonEnv) serveruser@ip-172-31-23-175:~$ salmon -h
+salmon v1.4.0
+
+Usage:  salmon -h|--help or
+        salmon -v|--version or
+        salmon -c|--cite or
+        salmon [--no-version-check] <COMMAND> [-h | options]
+
+Commands:
+     index      : create a salmon index
+     quant      : quantify a sample
+     alevin     : single cell analysis
+     swim       : perform super-secret operation
+     quantmerge : merge multiple quantifications into a single file
 
 Q15. What does the -o athal.fa.gz part of the command do?
-A15:
+A15: the -o gives us an progress bar to see how our download is going and athal.fa.gz is the data we are downloading. 
 
 Q16. What is a .gz file?
-A16:
+A16: it is a compressed gzip file, combines files while saving space by compressing them. 
 
 Q17. What does the zcat command do?
-A17:
+A17: allows the user to expand and view a compressed file without uncompressing that file
 
 Q18. what does the head command do?
-A18:
+A18: it just gives us the first (n) amount of lines in our file 
 
 Q19. what does the number 100 signify in the command?
-A19:
+A19: we want to see 100 lines from the athal.fa.gz file
 
 Q20. What is | doing? -- Hint using | in Linux is called "piping"
-A20:
+A20: It is sperating the two commands we wrote in our 1 line, first the zcat command will run and then immediately the head command will look at our athal data. 
 
 Q21. What is a .fa file? What is this file format used for?
-A21:
+A21: it is a fasta file format and contains our raw sequencing data. 
 
 Q22. What format are the downloaded sequencing reads in? 
-A22:
+A22: prefetch should acquire the SRA Normalized Format file for our files, which is our FASTQ-files. 
 
 Q23. What is the total size of the disk?
-A23:
+A23: 7.6Gb 
 
 Q24. How much space is remaining on the disk?
-A24:
+A24: 1.8Gb
 
 Q25. What went wrong?
-A25:
+A25:  fastq-dump.3.0.0 err: storage exhausted while writing file within file system module - system bad file descriptor error fd='4' repeated. error code 3
+
+Q26: What was your solution? 
+A26: $fastq-dump --gzip --skip-technical --clip SRR047122
+
+
 
 
 

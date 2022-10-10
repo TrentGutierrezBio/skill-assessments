@@ -1,0 +1,39 @@
+---
+title: "Linux Personal Notes"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+To add a user: $ sudo adduser [name]
+to delete a user: $ sudo killall -u [name] (end process)
+                  $ sudo deluser [name] (should be successful)
+
+
+to add a password to a user: $ sudo passwd [name]
+                               Make a password ^
+
+to give our user Sudo access: $ sudo usermod -a -G wheel [name] 
+                                (I think the wheel group should give 
+                                 our user permission to use sudo)
+                                 
+add a home directory for our user: $sudo mkhomedir_helper [name]
+                                   $pwd (to double check if it worked)
+                                   
+How to add a server user to our Ubuntu server: $sudo nano /etc/ssh/sshd_config
+                                               (look for PasswordAuthentication no,
+                                                change that to yes and save the new 
+                                                output) 
+                                               $sudo systemctl restart ssh (to restart                                                  the ssh server)
+                                               
+How to connect to our serveruser: (use the normal SSH log in for the server)
+                                  Just type out our secure password, done!
+                              
+to activate salmon enviroment: $ mamba activate salmonEnv
+
+                                   
+                                   
