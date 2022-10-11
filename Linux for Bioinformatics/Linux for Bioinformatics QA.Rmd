@@ -124,7 +124,7 @@ Commands:
      quantmerge : merge multiple quantifications into a single file
 
 Q15. What does the -o athal.fa.gz part of the command do?
-A15: the -o gives us an progress bar to see how our download is going and athal.fa.gz is the data we are downloading. 
+A15: -o specifies our output of the download
 
 Q16. What is a .gz file?
 A16: it is a compressed gzip file, combines files while saving space by compressing them. 
@@ -139,7 +139,7 @@ Q19. what does the number 100 signify in the command?
 A19: we want to see 100 lines from the athal.fa.gz file
 
 Q20. What is | doing? -- Hint using | in Linux is called "piping"
-A20: It is sperating the two commands we wrote in our 1 line, first the zcat command will run and then immediately the head command will look at our athal data. 
+A20: It is separating the two commands we wrote in our 1 line, first the zcat command will run and then immediately the head command will look at our athal data. 
 
 Q21. What is a .fa file? What is this file format used for?
 A21: it is a fasta file format and contains our raw sequencing data. 
@@ -157,7 +157,7 @@ Q25. What went wrong?
 A25:  fastq-dump.3.0.0 err: storage exhausted while writing file within file system module - system bad file descriptor error fd='4' repeated. error code 3
 
 Q26: What was your solution? 
-A26: $fastq-dump --gzip --skip-technical --clip SRR047122
+A26: $fastq-dump --gzip --skip-technical --clip SRR074122
 
 
 

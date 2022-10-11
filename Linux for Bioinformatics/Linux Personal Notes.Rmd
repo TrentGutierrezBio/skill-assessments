@@ -24,5 +24,7 @@ add a home directory for our user: $sudo mkhomedir_helper [name]
                                   
 If you can't delete a user due to a process use: $sudo pkill -KILL -u [user]
                                                  $sudo deluser ubuntu
-                                                 
-            
+                                                
+Key-less server set up: $sudo nano /etc/ssh/sshd_config 
+                        replace password authentication "no" with "yes"
+                        $sudo systemctl restart ssh

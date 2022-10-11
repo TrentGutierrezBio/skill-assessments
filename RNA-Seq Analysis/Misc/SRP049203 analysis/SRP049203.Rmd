@@ -1,0 +1,155 @@
+---
+title: "SRP049203"
+author: "Trent Gutierrez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(BiocManager)
+library(recount)
+library(RColorBrewer)
+library(pheatmap)
+library(DT)
+library(DESeq2)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(styler)
+library(kableExtra)
+library(fgsea)
+library(stats)
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Hs.eg.db)
+library(devtools)
+library(conflicted)
+library(stringr)
+library(fgsea)
+library(data.table)
+library(biomaRt)
+library(EnhancedVolcano)
+library(gage)
+library(gageData)
+```
+
+```{r}
+url <- download_study("SRP049203") 
+load(file.path("SRP049203", 'rse_gene.Rdata'))
+```
+```{r}
+metadata <- colData(rse_gene)
+
+metadata$conditions <- sapply(metadata$characteristics, function(x){x[3]}) %>%
+                       grepl(pattern = "Healthy") %>%
+                       ifelse("control","Disease")
+  
+  
+metadata$genotype <- sapply(metadata$characteristics, function(x){x[4]}) %>%
+                       grepl(pattern = "Wild Type") %>%
+                       ifelse("WT","GBA+N370S")
+```
+
+```{r}
+metadata %>% 
+  as.data.frame() %>%
+  dplyr::select(genotype,conditions) %>%
+  kbl(caption = "Table 1: Metadata for SRP014027") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, html_font = "Cambria")
+```
+
+```{r}
+rse_gene$genotype  <- metadata$genotype
+
+rse_gene$condition <- metadata$conditions
+
+dds <- DESeqDataSet(rse_gene, design = ~condition)
+dds <- DESeq(dds)
+```
+
+```{r}
+result <- results(dds, contrast = c("condition","Disease","control"))
+
+result_dataframe <- as.data.frame(result)
+
+fullensemblID <- rownames(result_dataframe) %>%
+  str_replace(pattern = "\\..*",replacement = "")
+```
+
+```{r}
+sampledist <- vst(dds) %>%
+  assay() %>%
+  t() %>%
+  dist()
+
+
+sampledistmatrix <- as.matrix(sampledist)
+
+vsd_dds <- vst(dds)
+
+rownames(sampledistmatrix) <- paste(vsd_dds$condition, vsd_dds$genotype, sep="-")
+colnames(sampledistmatrix) <- NULL
+
+colsBlue <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+```
+
+```{r}
+distheatmap <- pheatmap(sampledistmatrix,
+                        clustering_distance_rows=sampledist,
+                        clustering_distance_cols=sampledist,
+                        col=colsBlue)
+```
+
+```{r}
+plotPCA(vsd_dds, intgroup = c("condition","genotype"))
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
