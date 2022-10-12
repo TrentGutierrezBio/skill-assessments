@@ -28,12 +28,19 @@ How to add a server user to our Ubuntu server: $sudo nano /etc/ssh/sshd_config
                                                (look for PasswordAuthentication no,
                                                 change that to yes and save the new 
                                                 output) 
-                                               $sudo systemctl restart ssh (to restart                                                  the ssh server)
+                                               $sudo systemctl restart ssh (to restart the ssh server)
                                                
 How to connect to our serveruser: (use the normal SSH log in for the server)
                                   Just type out our secure password, done!
                               
 to activate salmon enviroment: $ mamba activate salmonEnv
+
+If you can't delete a user due to a process use: $sudo pkill -KILL -u [user]
+                                                 $sudo deluser ubuntu
+                                                
+                        
+#Tip: Always look at the version of a package you're using if you keep getting errors 0.14.2 salmon IS NOT the same as 1.4.0 salmon. 
+
 
                                    
                                    
